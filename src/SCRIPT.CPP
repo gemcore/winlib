@@ -1,16 +1,20 @@
 /*0===========================================================================
 **
-** File:       Script.hpp
+** File:       Script.cpp
 **
-** Purpose:    Simple Script parsing class methods.
+** Purpose:    Simple scripting support.
 **
 **
 **
 **
 ** Date:       Nov. 15, 1999
 **
-** Author:     Alan D. Graves
+** Author:     Yi He
 **
+**
+** Rev  Date      Id    Description
+** ---  --------- ---   -----------
+** 1.00 Nov-15-99 YH    Created.
 **============================================================================
 */
 #include "script.hpp"
@@ -24,7 +28,9 @@ SCRIPT_GRAMMER sg[]=
 	"delay",	SCRIPT_DELAY,
 	"timeout",	SCRIPT_TIMEOUT,
 	"exit",		SCRIPT_EXIT,
-	"label",	SCRIPT_LABEL
+	"label",	SCRIPT_LABEL,
+	"var",		SCRIPT_VAR,
+	"goto",		SCRIPT_GOTO
 };
 
 char *toksep = " ;\t\n";
@@ -61,6 +67,48 @@ int SCRIPT::GetRecord(void)
 	return CurrentRecord; 
 }
 
+int SCRIPT::GetVar(int iNum, int *val)
+{
+	if (TotalRecord == 0)
+	{
+		return FALSE;
+	}
+	else
+	{
+		// CurrentRecord range:  0----(TotalRecord-1)
+		if (iNum < TotalRecord)
+		{
+			*val = ((RECDATA *)Msg[iNum].pData)->iArray[0];
+			return TRUE;
+		}
+		else
+		{
+			return FALSE;
+		}
+	}
+}
+
+int SCRIPT::SetVar(int iNum, int val)
+{
+	if (TotalRecord == 0)
+	{
+		return FALSE;
+	}
+	else
+	{
+		// CurrentRecord range:  0----(TotalRecord-1)
+		if (iNum < TotalRecord)
+		{
+			((RECDATA *)Msg[iNum].pData)->iArray[0] = val;
+			return TRUE;
+		}
+		else
+		{
+			return FALSE;
+		}
+	}
+}
+
 int  SCRIPT::GetNextRecord(SCRIPT_RECORD *pRec)
 {
 	if ( TotalRecord == 0 )
@@ -86,7 +134,7 @@ int  SCRIPT::GetNextRecord(SCRIPT_RECORD *pRec)
 	}
 }
 
-int  SCRIPT::FindLabelRecord(int iNext)
+int  SCRIPT::FindTypeRecord(int type, int next)
 {
 	SCRIPT_RECORD *pRec;
 
@@ -94,9 +142,9 @@ int  SCRIPT::FindLabelRecord(int iNext)
 	for (int i = 0; i < TotalRecord; i++)
 	{
 		pRec = &Msg[i];
-		if (pRec->iType == SCRIPT_LABEL)
+		if (pRec->iType == type)
 		{
-			if (pRec->iNext == iNext)
+			if (pRec->iNext == next)
 			{
 				// Record found.
 				return i;
@@ -209,8 +257,9 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
     SCRIPT_RECORD *ip=msg;
 	char szInfo[512];
 	char *p;
+	int rc = 0;
 	
-	linenum = 1;
+	linenum = 0;
 	
 	if ( !FileOpen(filename) )
     {
@@ -251,7 +300,7 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 					if (*pSrc != '\\')
 					{
 						*pDest++ = *pSrc++;
-						cnt++;
+						if (++cnt >= sizeof(Data)) goto errmem;
 					}
 					else
 					{
@@ -259,9 +308,8 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 						if ( *pSrc!='x' && *pSrc!='X' )
 						{
 							sprintf(szInfo, "Wrong Escape string %s", tp );
-							ReadError(szInfo);			
-							FileClose();
-							return -2;
+							rc = -2;
+							goto err;
 						}
 						else
 						{							
@@ -275,13 +323,12 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 							if ( !isxdigit(szByte[0]) || !isxdigit(szByte[1]) )
 							{
 								sprintf(szInfo, "Wrong Escape string %s", tp );
-								ReadError(szInfo);			
-								FileClose();
-								return -3;
+								rc = -3;
+								goto err;
 							}
 							sscanf(szByte, "%02X", pDest);
 							pDest++;
-							cnt++;
+							if (++cnt >= sizeof(Data)) goto errmem;
 						}
 					}
 				}				
@@ -292,6 +339,7 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 			{
 				tp = strtok(NULL,toksep);
 				cnt = strlen(tp) + 1;
+				if (cnt >= sizeof(Data)) goto errmem;
 				strcpy(p, tp);
 				Msg[CurrentRecord].iType = sg[SCRIPT_TXFILE].iType;
 			}
@@ -313,7 +361,7 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 							if (*pSrc != '\\')
 							{
 								*pDest++ = *pSrc++;
-								cnt++;
+								if (++cnt >= sizeof(Data)) goto errmem;
 							}
 							else
 							{
@@ -321,9 +369,8 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 								if (*pSrc != 'x' && *pSrc != 'X')
 								{
 									sprintf(szInfo, "Wrong Escape string %s", tp);
-									ReadError(szInfo);
-									FileClose();
-									return -4;
+									rc = -4;
+									goto err;
 								}
 								else
 								{
@@ -337,13 +384,12 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 									if (!isxdigit(szByte[0]) || !isxdigit(szByte[1]))
 									{
 										sprintf(szInfo, "Wrong Escape string %s", tp);
-										ReadError(szInfo);
-										FileClose();
-										return -5;
+										rc = -5;
+										goto err;
 									}
 									sscanf(szByte, "%02X", pDest);
 									pDest++;
-									cnt++;
+									if (++cnt >= sizeof(Data)) goto errmem;
 								}
 							}
 						}
@@ -366,6 +412,7 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 			{
 				tp = strtok(NULL, toksep);
 				cnt = sizeof(int);
+				if (cnt >= sizeof(Data)) goto errmem;
 				sscanf(tp, "%d", p);
 				Msg[CurrentRecord].iType = sg[SCRIPT_SKIP].iType;
 			}
@@ -373,6 +420,7 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 			{
 				tp = strtok(NULL,toksep);
 				cnt = sizeof(int);
+				if (cnt >= sizeof(Data)) goto errmem;
 				sscanf(tp, "%d", p);
 				Msg[CurrentRecord].iType = sg[SCRIPT_DELAY].iType;
 			}
@@ -380,6 +428,7 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 			{
 				tp = strtok(NULL,toksep);
 				cnt = sizeof(int);
+				if (cnt >= sizeof(Data)) goto errmem;
 				sscanf(tp, "%d", p);
 				Msg[CurrentRecord].iType = sg[SCRIPT_TIMEOUT].iType;
 			}
@@ -398,12 +447,63 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 				Msg[CurrentRecord].iType = sg[SCRIPT_LABEL].iType;
 				Msg[CurrentRecord].iNext = n;
 			}
+			else  if (!strcmp(tp, sg[SCRIPT_VAR].szKey))
+			{
+				int token = 0;
+				int n = 0;
+				char *pDest = p;
+
+				/* Get next token. */
+				cnt = 0;
+				while ((tp = strtok(NULL, toksep)) != NULL)
+				{
+					if (token == 0)
+					{
+						sscanf(tp, "%d", &n);
+					}
+					else
+					{
+						cnt += sizeof(int);
+						if (cnt >= sizeof(Data)) goto errmem;
+						sscanf(tp, "%d", pDest);
+						pDest += sizeof(int);
+					}
+					token++;
+				}
+				Msg[CurrentRecord].iType = sg[SCRIPT_VAR].iType;
+				Msg[CurrentRecord].iNext = n;
+			}
+			else  if (!strcmp(tp, sg[SCRIPT_GOTO].szKey))
+			{
+				int token = 0;
+				int n = 0;
+				char *pDest = p;
+
+				/* Get next token. */
+				cnt = 0;
+				while ((tp = strtok(NULL, toksep)) != NULL)
+				{
+					if (token == 0)
+					{
+						sscanf(tp, "%d", &n);
+					}
+					else
+					{
+						cnt += sizeof(int);
+						if (cnt >= sizeof(Data)) goto errmem;
+						sscanf(tp, "%d", pDest);
+						pDest += sizeof(int);
+					}
+					token++;
+				}
+				Msg[CurrentRecord].iType = sg[SCRIPT_GOTO].iType;
+				Msg[CurrentRecord].iNext = n;
+			}
 			else
 			{
 				sprintf(szInfo, "Incorrect Message Type %s", tp);
-				ReadError(szInfo);
-				FileClose();
-				return -6;
+				rc = -6;
+				goto err;
 			}
         }
 		Msg[CurrentRecord].iLen = cnt;
@@ -413,16 +513,26 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 		if (++CurrentRecord >= MaxMsgCnt)
         {
 			ReadError("Too many messages!");
-			FileClose();
-			return -7;
+			rc = -7;
+			goto err;
         }
     }
 
-//eof:
 	TotalRecord = CurrentRecord;
-	sprintf( szInfo, "Total messages   %d Ok", TotalRecord);
-	Display ( szInfo );
+	sprintf(szInfo, "Total messages   %d Ok", TotalRecord);
+exit:
+	Display(szInfo);
 	FileClose();
-	return 0;
+	return rc;
+
+errmem:
+	sprintf(szInfo, "Out of Data space!");
+	rc = -8;
+	// fall through...
+err:
+	ReadError(szInfo);
+	FileClose();
+	return rc;
+
 }
 

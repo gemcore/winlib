@@ -2,17 +2,22 @@
 **
 ** File:       Script.hpp
 **
-** Purpose:    Simple Script parsing class definitions.
+** Purpose:    Simple Script Support
 **
 **
 **
 **
 ** Date:       Nov. 15, 1999
 **
-** Author:     Alan D. Graves
+** Author:     Yi He
 **
+**
+** Rev  Date      Id    Description
+** ---  --------- ---   -----------
+** 1.00 Nov-15-99 YH    Created.
 **============================================================================
 */
+
 #ifndef _SCRIPT_HPP
 #define _SCRIPT_HPP
 #include <windows.h>
@@ -30,6 +35,8 @@ enum SCRIPT_TYPE
 	SCRIPT_TIMEOUT,			// timeout
 	SCRIPT_EXIT,			// exit
 	SCRIPT_LABEL,			// label
+	SCRIPT_VAR,				// var
+	SCRIPT_GOTO,			// goto
 	SCRIPT_TOTAL_TYPES
 };
 
@@ -54,6 +61,8 @@ typedef union
 	char szTxChars[SCRIPT_MAX_CHAR];
 	char szFileName[SCRIPT_MAX_CHAR];
 	char szWaitChars[SCRIPT_MAX_CHAR];
+	int iArray[0];
+	int iValue;
 	int iSkip;
 	int iDelay;
 	int iTimeout;
@@ -90,9 +99,11 @@ public:
 
 	int Load(char *szFileName);
 	int GetNextRecord(SCRIPT_RECORD *pRec);
-	int FindLabelRecord(int iNum);
+	int FindTypeRecord(int type, int next);
 	void SetRecord(int iNum);
 	int GetRecord(void);
+	int GetVar(int iNum, int *var);
+	int SetVar(int iNum, int val);
 	int	GetTotalRecord(void) {return TotalRecord; }
 	void SetCallBack(SCRIPT_CALLBACK pfnScr) { pfnCallBack = pfnScr; }
 };
