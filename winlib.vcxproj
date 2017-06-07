@@ -152,6 +152,7 @@
     <ClInclude Include="src\SYSERR.H" />
     <ClInclude Include="src\Thread.h" />
     <ClInclude Include="src\TIMER.H" />
+    <ClInclude Include="src\TMR.H" />
     <ClInclude Include="src\Utils.hpp" />
     <ClInclude Include="src\wassert.h" />
     <ClInclude Include="src\Win32Exception.hpp" />

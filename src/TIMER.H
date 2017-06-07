@@ -155,19 +155,6 @@ public:
 
 #pragma check_stack( )
 
-extern CTimer *timer;
-
-extern void TMR_Init(void);
-extern void TMR_Term(void);
-extern Tmr  TMR_New(void);
-extern void TMR_Delete(Tmr t);
-extern void TMR_Start(Tmr t, int ticks);
-extern void TMR_Stop(Tmr t);
-extern int  TMR_IsTimeout(Tmr t);
-extern void TMR_Delay(int ticks);
-extern void TMR_Event(int ticks, CTimerEvent *e, char mode);
-extern void TMR_Process(void);
-
 #endif
 
 

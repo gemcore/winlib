@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "windows.h"
 #include "src\comport.h"
+#include "src\tmr.h"
 
 ComPort com(3, CBR_115200);
 
@@ -11,9 +12,22 @@ void ComPort::Process(void)
 {
 }
 
+class ATmr : CTimerFunc
+{
+	void Func(void)
+	{
+		printf(".");
+	}
+};
+
+ATmr atmr;
+
 int main()
 {
 	printf("winlib\n");
+
+	TMR_Init();
+
 	if (com.Start())
 	{
 		unsigned char buf[80];
@@ -30,6 +44,18 @@ int main()
 		}
 		com.Stop();
 	}
-    return 0;
+
+	printf("\nperiodic timer ");
+	TMR_Event(5, (CTimerEvent *)&atmr, PERIODIC);
+	TMR_Delay(20);
+	printf("2 seconds ");
+	TMR_Delay(50);
+	printf("5 seconds ");
+	TMR_Event(0, (CTimerEvent *)&atmr, PERIODIC);
+	printf("\n");
+	TMR_Term();
+
+	printf("exiting\n");
+	return 0;
 }
 

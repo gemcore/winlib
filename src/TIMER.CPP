@@ -17,13 +17,13 @@
 #include <stddef.h>                 /* C standard definitions */
 #include "timer.h"                  /* Generic timer class definition */
 
+#define TRACE	//printf
+
 /*==========================================================================
 |
 |  constants
 |
 ===========================================================================*/
-
-CTimer *timer;
 
 /*==========================================================================
 |
@@ -44,9 +44,9 @@ CTimer *timer;
 
 CTimer::CTimer()
 {
-//   trace_ch('T');
+    TRACE("CTimer() called\n");
 
-   SetCallback(NULL,NULL);
+    SetCallback(NULL,NULL);
 
 	InitData();                      // initialize data structures
 }
@@ -63,6 +63,7 @@ CTimer::CTimer()
 
 CTimer::~CTimer()
 {
+	TRACE("~CTimer() called\n");
 	if (Last)                        // deallocate data structures
    {
       for (int i=0; i < MAX_EVENTS; i++)
@@ -91,7 +92,7 @@ CTimer::~CTimer()
 
 void CTimer::InitData(void)
 {
-//   printf("\nCTimer::InitData() called");
+   TRACE("\nCTimer::InitData() called");
 #ifndef WIN32
 	short sreg = int_disable();      // disable interupts while in here
 #endif

@@ -66,6 +66,9 @@
     <ClInclude Include="src\winex.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\TMR.H">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -92,13 +95,13 @@
     <ClCompile Include="src\TIMER.CPP">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\TMR.CPP">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\Utils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Win32Exception.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\TMR.CPP">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -13,102 +13,158 @@
 **
 **============================================================================
 */
-#include "TIMER.H"
+#include "TMR.H"
 
 #ifdef WIN32
-/* Not strictly necessary if TMR_ functions are used by a single Windows Thread. */
-#include "Thread.h"
+#include "active.h"
 
 static Mutex TMR_Mutex;
 #endif
 
-class ATmr : public CTimerFunc
+/*
+** Simple Timer support functions adapted to WIN32 thread API.
+*/
+#define WIN32_LEAN_AND_MEAN		// Exclude rarely-used stuff from Windows headers
+
+#include <stdio.h>
+#include <windows.h>
+#include <process.h>
+
+class TMR : CTimer, ActiveObject
 {
-	void Func(void);
+private:
+	char *getname() { return "TMR"; }
+
+	void InitThread() { }
+	void Run();
+	void FlushThread() { }
+
 public:
-   ATmr()
-      { TMR_Event(1000,this,PERIODIC); }
-   ~ATmr()
-     { TMR_Event(0,this,PERIODIC); }
+	TMR() : CTimer(), ActiveObject()
+	{
+		//printf("TMR() called\n");
+		Resume();
+	}
+
+	Tmr  New(void)
+	{
+		return (Tmr) new CTimerFlag();
+	}
+
+	void Delete(Tmr t)
+	{
+		Cancel((CTimerEvent *)t);
+		delete (CTimerEvent *)t;
+	}
+
+	void Start(Tmr t, int ticks)
+	{
+		Schedule(ticks, (CTimerEvent *)t, SINGLE);
+	}
+
+	void Stop(Tmr t)
+	{
+		Cancel((CTimerEvent *)t);
+	}
+
+	int IsTimeout(Tmr t)
+	{
+		return ((CTimerFlag *)t)->Flag == 0;
+	}
 };
 
-ATmr *atmr;
-
-void ATmr::Func(void)
+void TMR::Run(void)
 {
-   // Toggle a 'heartbeat' LED.
-   //DEBUG("+");
-}
-
-void TMR_Init(void)
-{
-   atmr = new ATmr();	/* Acquire a periodic 'heartbeat' timer. */
-}
-
-void TMR_Term(void)
-{
-   delete atmr;
-}
-
-Tmr  TMR_New( void )
-{
-   return (Tmr)new CTimerFlag;
-}
-
-void TMR_Delete( Tmr t )
-{
-   delete (CTimerFlag *)t;
-}
-
-void TMR_Start( Tmr t,int ticks )
-{
-   ((CTimerFlag *)t)->Flag = 0;
-   TMR_Event( ticks,(CTimerFlag *)t,SINGLE );
-}
-
-void TMR_Stop( Tmr t )
-{
-   TMR_Event( 0, (CTimerFlag *)t, SINGLE );
-   ((CTimerFlag *)t)->Flag = 0;
-}
-
-int TMR_IsTimeout( Tmr t )
-{
-   return ((CTimerFlag*)t)->Flag;
-}
-
-void TMR_Delay(int ticks)
-{
-#ifdef WIN32
-	Lock lock(TMR_Mutex);
-#endif
-	if (ticks == 0)
+	printf("%s: Run()\n", getname());
+	for (;;)
 	{
-		//Sleep(ticks);
-	}
-	else
-	{
-		CTimerFlag d;
-		timer->Schedule(ticks, &d);
-		while (!d.Flag)
-			;
+		if (_isDying)
+			return;
+
+		// Do processing for timer thread here...
+		ProcessTimers();
+
+		// Use a 100ms timebase.
+		Sleep(100);
 	}
 }
 
-void TMR_Event(int ticks, CTimerEvent *e, char mode)
+TMR *tmr;
+
+extern "C"
 {
+	void TMR_Init(void)
+	{
+		tmr = new TMR();
+	}
+
+	void TMR_Term(void)
+	{
+		delete tmr;
+		tmr = NULL;
+	}
+
+	Tmr  TMR_New(void)
+	{
+		return tmr->New();
+	}
+
+	void TMR_Delete(Tmr t)
+	{
 #ifdef WIN32
-	Lock lock(TMR_Mutex);
+		Lock lock(TMR_Mutex);
 #endif
-	if (ticks)
-		timer->Schedule(ticks, e, mode);
-	else
-		timer->Cancel(e);
-}
+		tmr->Delete(t);
+	}
 
-void TMR_Process(void)
-{
-	timer->ProcessTimers();
-}
+	void TMR_Start(Tmr t, int ticks)
+	{
+#ifdef WIN32
+		Lock lock(TMR_Mutex);
+#endif
+		tmr->Start(t, ticks);
+	}
 
+	void TMR_Stop(Tmr t)
+	{
+#ifdef WIN32
+		Lock lock(TMR_Mutex);
+#endif
+		tmr->Stop(t);
+	}
+
+	int  TMR_IsTimeout(Tmr t)
+	{
+		return tmr->IsTimeout(t);
+	}
+
+	void TMR_Delay(int ticks)
+	{
+		if (ticks == 0)
+		{
+			//Sleep(ticks);
+		}
+		else
+		{
+#ifdef WIN32
+			Lock lock(TMR_Mutex);
+#endif
+			CTimerFlag d;
+			((CTimer *)tmr)->Schedule(ticks, &d);
+			while (!d.Flag)
+				;
+		}
+	}
+
+	void TMR_Event(int ticks, CTimerEvent *e, char mode=SINGLE)
+	{
+#ifdef WIN32
+		Lock lock(TMR_Mutex);
+#endif
+		if (ticks)
+			((CTimer *)tmr)->Schedule(ticks, e, mode);
+		else
+			((CTimer *)tmr)->Cancel(e);
+	}
+}
 
