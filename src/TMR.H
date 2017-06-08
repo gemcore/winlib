@@ -6,7 +6,7 @@
 
 extern "C"
 {
-	void TMR_Init(void);
+	void TMR_Init(int timebase);
 	void TMR_Term(void);
 	Tmr  TMR_New(void);
 	void TMR_Delete(Tmr t);

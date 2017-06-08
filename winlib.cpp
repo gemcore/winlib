@@ -26,13 +26,12 @@ int main()
 {
 	printf("winlib\n");
 
-	TMR_Init();
-
+	/* Serial port testing. */
 	if (com.Start())
 	{
 		unsigned char buf[80];
 		com.Write("AT\r",3);
-		com.Sleep(100);
+		com.Sleep(2000);
 		int n = com.Read((LPSTR)buf, sizeof(buf));
 		if (n > 0)
 		{
@@ -45,7 +44,9 @@ int main()
 		com.Stop();
 	}
 
-	printf("\nperiodic timer ");
+	/* Timer testing. */
+	TMR_Init(100);	// 100ms timebase
+	printf("\nperiodic heartbeat ");
 	TMR_Event(5, (CTimerEvent *)&atmr, PERIODIC);
 	TMR_Delay(20);
 	printf("2 seconds ");

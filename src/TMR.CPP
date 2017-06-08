@@ -15,6 +15,8 @@
 */
 #include "TMR.H"
 
+#define TRACE	//printf
+
 #ifdef WIN32
 #include "active.h"
 
@@ -34,15 +36,16 @@ class TMR : CTimer, ActiveObject
 {
 private:
 	char *getname() { return "TMR"; }
-
+	int timebase;
 	void InitThread() { }
 	void Run();
 	void FlushThread() { }
 
 public:
-	TMR() : CTimer(), ActiveObject()
+	TMR(int timebase=100)  
+		: timebase(timebase), CTimer(), ActiveObject()
 	{
-		//printf("TMR() called\n");
+		TRACE("%s(%d) called\n", getname(), timebase);
 		Resume();
 	}
 
@@ -75,7 +78,7 @@ public:
 
 void TMR::Run(void)
 {
-	printf("%s: Run()\n", getname());
+	TRACE("%s::Run()\n", getname());
 	for (;;)
 	{
 		if (_isDying)
@@ -84,8 +87,8 @@ void TMR::Run(void)
 		// Do processing for timer thread here...
 		ProcessTimers();
 
-		// Use a 100ms timebase.
-		Sleep(100);
+		// Use a tick in milli-seconds.
+		Sleep(timebase);
 	}
 }
 
@@ -93,9 +96,9 @@ TMR *tmr;
 
 extern "C"
 {
-	void TMR_Init(void)
+	void TMR_Init(int timebase)
 	{
-		tmr = new TMR();
+		tmr = new TMR(timebase);
 	}
 
 	void TMR_Term(void)
