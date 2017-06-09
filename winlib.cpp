@@ -30,14 +30,14 @@ int main()
 	if (com.Start())
 	{
 		unsigned char buf[80];
-		com.Write("AT\r",3);
+		com.Write("AT\r", 3);
 		com.Sleep(2000);
 		int n = com.Read((LPSTR)buf, sizeof(buf));
 		if (n > 0)
 		{
 			for (int i = 0; i < n; i++)
 			{
-				printf("%c",buf[i]);
+				printf("%c", buf[i]);
 			}
 			printf("\n");
 		}
@@ -46,7 +46,17 @@ int main()
 
 	/* Timer testing. */
 	TMR_Init(100);	// 100ms timebase
-	printf("\nperiodic heartbeat ");
+	printf("\nset 1 second timer ");
+	Tmr t = TMR_New();
+	TMR_Start(t, 10);
+	while (!TMR_IsTimeout(t))
+	{
+		TMR_Delay(1);
+		printf(".");
+	}
+	printf("done\n");
+
+	printf("periodic heartbeat ");
 	TMR_Event(5, (CTimerEvent *)&atmr, PERIODIC);
 	TMR_Delay(20);
 	printf("2 seconds ");

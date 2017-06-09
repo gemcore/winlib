@@ -72,7 +72,7 @@ public:
 
 	int IsTimeout(Tmr t)
 	{
-		return ((CTimerFlag *)t)->Flag == 0;
+		return ((CTimerFlag *)t)->Flag > 0;
 	}
 };
 
