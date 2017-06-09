@@ -435,7 +435,16 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 			else if (!strcmp(tp, sg[SCRIPT_EXIT].szKey))
 			{
 				tp = strtok(NULL, toksep);
-				cnt = 0;
+				if (tp != NULL)
+				{
+					cnt = sizeof(int);
+					if (cnt >= sizeof(Data)) goto errmem;
+					sscanf(tp, "%d", p);
+				}
+				else
+				{
+					cnt = 0;
+				}
 				Msg[CurrentRecord].iType = sg[SCRIPT_EXIT].iType;
 			}
 			else  if (!strcmp(tp, sg[SCRIPT_LABEL].szKey))

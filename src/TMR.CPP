@@ -125,6 +125,7 @@ extern "C"
 #ifdef WIN32
 		Lock lock(TMR_Mutex);
 #endif
+		((CTimerFlag *)t)->Flag = 0;
 		tmr->Start(t, ticks);
 	}
 
