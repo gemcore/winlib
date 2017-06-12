@@ -29,6 +29,7 @@ enum SCRIPT_TYPE
 {
 	SCRIPT_TXCHAR = 0,		// tx
 	SCRIPT_TXFILE,			// txfile
+	SCRIPT_TXVAR,			// txvar
 	SCRIPT_RXCHAR,			// rx
 	SCRIPT_SKIP,			// skip
 	SCRIPT_DELAY,			// delay
@@ -90,7 +91,6 @@ class SCRIPT
 	int ReadByte(BYTE *data);
 	int ReadByteArray(BYTE *data,int n);
 	void ReadError(char *msg);
-	unsigned char *atobytes(char *s,unsigned char *bytes,int n);
 	void Display(char *szDisplay)	{ if( pfnCallBack ) pfnCallBack(szDisplay); }
 
 public:
@@ -98,11 +98,12 @@ public:
 	~SCRIPT();
 
 	int Load(char *szFileName);
+	SCRIPT_RECORD *GetMsg(int iNum);
 	int GetNextRecord(SCRIPT_RECORD *pRec);
 	int FindTypeRecord(int type, int next);
 	void SetRecord(int iNum);
 	int GetRecord(void);
-	int GetVar(int iNum, int *var);
+	int GetVar(int iNum, int *var, int i=0);
 	int SetVar(int iNum, int val);
 	int	GetTotalRecord(void) {return TotalRecord; }
 	void SetCallBack(SCRIPT_CALLBACK pfnScr) { pfnCallBack = pfnScr; }

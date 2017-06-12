@@ -19,10 +19,16 @@
 */
 #include "script.hpp"
 
+#define TRACE	//printf
+
+unsigned char *atobytes(char *s, unsigned char *bytes, int n);
+char *bytestoa(unsigned char *bytes, char *s, int n);
+
 SCRIPT_GRAMMER sg[]=
 {
 	"tx",		SCRIPT_TXCHAR,
 	"txfile",	SCRIPT_TXFILE,
+	"txvar",	SCRIPT_TXVAR,
 	"rx",		SCRIPT_RXCHAR,
 	"skip",		SCRIPT_SKIP,
 	"delay",	SCRIPT_DELAY,
@@ -35,6 +41,7 @@ SCRIPT_GRAMMER sg[]=
 
 char *toksep = " ;\t\n";
 char *tokptr;
+char *tokval = " ,\t\n";
 
 SCRIPT::SCRIPT(SCRIPT_CALLBACK pfnScr)
 {
@@ -57,7 +64,15 @@ int SCRIPT::Load(char *szFileName)
 	return ReadMsgFile(szFileName, Msg, SCRIPT_MAX_RECORDS);
 }
 
-void SCRIPT::SetRecord(int iNum) 
+SCRIPT_RECORD *SCRIPT::GetMsg(int iNum)
+{
+	if (iNum < TotalRecord)
+		return &Msg[iNum];
+	else
+		return NULL;
+}
+
+void SCRIPT::SetRecord(int iNum)
 { 
 	CurrentRecord = iNum; 
 }
@@ -67,7 +82,7 @@ int SCRIPT::GetRecord(void)
 	return CurrentRecord; 
 }
 
-int SCRIPT::GetVar(int iNum, int *val)
+int SCRIPT::GetVar(int iNum, int *val, int i)
 {
 	if (TotalRecord == 0)
 	{
@@ -78,7 +93,7 @@ int SCRIPT::GetVar(int iNum, int *val)
 		// CurrentRecord range:  0----(TotalRecord-1)
 		if (iNum < TotalRecord)
 		{
-			*val = ((RECDATA *)Msg[iNum].pData)->iArray[0];
+			*val = ((RECDATA *)Msg[iNum].pData)->iArray[i];
 			return TRUE;
 		}
 		else
@@ -237,19 +252,6 @@ void SCRIPT::ReadError(char *msg)
 	Display(szErrMsg);		
 }
 
-unsigned char *SCRIPT::atobytes(char *s,unsigned char *bytes,int n)
-{
-   unsigned char *bp = bytes;
-   for (int i=0; i < 2*n; i+=2)
-   {
-      int byte=0;
-      if (sscanf(&s[i],"%02x",&byte) == EOF)
-         break;
-      *bp++ = (unsigned char)byte;
-   }
-   return bytes;
-}
-
 int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 {
     char *line;
@@ -305,7 +307,7 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 					else
 					{
 						pSrc++;
-						if ( *pSrc!='x' && *pSrc!='X' )
+						if (*pSrc!='x' && *pSrc!='X')
 						{
 							sprintf(szInfo, "Wrong Escape string %s", tp );
 							rc = -2;
@@ -316,13 +318,13 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 							pSrc++;
 
 							char szByte[3];
-							szByte[0]= *pSrc++;	// high nibble
-							szByte[1]= *pSrc++;	// low nibble
-							szByte[2]= 0;
-							
-							if ( !isxdigit(szByte[0]) || !isxdigit(szByte[1]) )
+							szByte[0] = *pSrc++;	// high nibble
+							szByte[1] = *pSrc++;	// low nibble
+							szByte[2] = 0;
+
+							if (!isxdigit(szByte[0]) || !isxdigit(szByte[1]))
 							{
-								sprintf(szInfo, "Wrong Escape string %s", tp );
+								sprintf(szInfo, "Wrong Escape string %s", tp);
 								rc = -3;
 								goto err;
 							}
@@ -342,6 +344,29 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 				if (cnt >= sizeof(Data)) goto errmem;
 				strcpy(p, tp);
 				Msg[CurrentRecord].iType = sg[SCRIPT_TXFILE].iType;
+			}
+			else if (!strcmp(tp, sg[SCRIPT_TXVAR].szKey))
+			{
+				int n = 0;
+				char *pDest = p;
+				/* Get next token. */
+				cnt = 0;
+				if ((tp = strtok(NULL, toksep)) != NULL)
+				{
+					sscanf(tp, "%d", &n);
+					TRACE("var %d val[ ", n);
+					while ((tp = strtok(NULL, tokval)) != NULL)
+					{
+						cnt += sizeof(int);
+						if (cnt >= sizeof(Data)) goto errmem;
+						sscanf(tp, "%d", pDest);
+						TRACE("%s ", tp);
+						pDest += sizeof(int);
+					}
+					TRACE("]\n");
+				}
+				Msg[CurrentRecord].iType = sg[SCRIPT_TXVAR].iType;
+				Msg[CurrentRecord].iNext = n;				
 			}
 			else if (!strcmp(tp, sg[SCRIPT_RXCHAR].szKey))
 			{
@@ -458,26 +483,24 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 			}
 			else  if (!strcmp(tp, sg[SCRIPT_VAR].szKey))
 			{
-				int token = 0;
 				int n = 0;
 				char *pDest = p;
 
 				/* Get next token. */
 				cnt = 0;
-				while ((tp = strtok(NULL, toksep)) != NULL)
+				if ((tp = strtok(NULL, toksep)) != NULL)
 				{
-					if (token == 0)
-					{
-						sscanf(tp, "%d", &n);
-					}
-					else
+					sscanf(tp, "%d", &n);
+					TRACE("var %d val[ ", n);
+					while ((tp = strtok(NULL, tokval)) != NULL)
 					{
 						cnt += sizeof(int);
 						if (cnt >= sizeof(Data)) goto errmem;
 						sscanf(tp, "%d", pDest);
+						TRACE("%s ", tp);
 						pDest += sizeof(int);
 					}
-					token++;
+					TRACE("]\n");
 				}
 				Msg[CurrentRecord].iType = sg[SCRIPT_VAR].iType;
 				Msg[CurrentRecord].iNext = n;
@@ -528,7 +551,7 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
     }
 
 	TotalRecord = CurrentRecord;
-	sprintf(szInfo, "Total messages   %d Ok", TotalRecord);
+	sprintf(szInfo, "Total messages %d Ok", TotalRecord);
 exit:
 	Display(szInfo);
 	FileClose();
@@ -545,3 +568,62 @@ err:
 
 }
 
+/*****************************************************************************
+* Format functions
+*****************************************************************************/
+unsigned char gethexnibble(char ch)
+{
+	// Return hex nibble.
+	unsigned char usNib = ch;
+
+	// convert ascii -> hex
+	if (usNib >= '0' && usNib <= '9')
+		return usNib - '0';
+	else if (usNib >= 'a' && usNib <= 'f')
+		return usNib - 'a' + 10;
+	else
+		return 0xff;
+}
+
+unsigned char *atobytes(char *s, unsigned char *bytes, int n)
+{
+	int i;
+	unsigned char *bp = bytes;
+	for (i = 0; i < 2 * n; i += 2)
+	{
+		int byte = gethexnibble(s[i + 1]) + (gethexnibble(s[i + 0]) << 4);
+		*bp++ = (unsigned char)byte;
+	}
+	return bytes;
+}
+
+char *hextoa(char *s, unsigned char val)
+{
+	unsigned char _al, _ah;
+	if ((_ah = (val >> 4)) > 9)
+		_ah += 'a' - 0x0a;
+	else
+		_ah += '0';
+	if ((_al = (val & 0x0F)) > 9)
+		_al += 'a' - 0x0a;
+	else
+		_al += '0';
+	*(s + 0) = _ah;
+	*(s + 1) = _al;
+	*(s + 2) = '\0';
+	return s;
+}
+
+char *bytestoa(unsigned char *bytes, char *s, int n)
+{
+	int i;
+	unsigned char *bp = bytes;
+	s[0] = '\0';
+	for (i = 0; i < 2 * n; i += 2)
+	{
+		s[i] = '\0';
+		hextoa(&s[i], (*bp++) & 0xff);
+		//sprintf(&s[i],"%02x",(*bp++)&0xff);
+	}
+	return s;
+}
