@@ -27,7 +27,8 @@
 
 enum SCRIPT_TYPE
 {
-	SCRIPT_TXCHAR = 0,		// tx
+	SCRIPT_DATA = 0,		// data
+	SCRIPT_TXCHAR,			// tx
 	SCRIPT_TXFILE,			// txfile
 	SCRIPT_TXVAR,			// txvar
 	SCRIPT_RXCHAR,			// rx
@@ -38,6 +39,7 @@ enum SCRIPT_TYPE
 	SCRIPT_LABEL,			// label
 	SCRIPT_VAR,				// var
 	SCRIPT_GOTO,			// goto
+	SCRIPT_TEST,			// test
 	SCRIPT_TOTAL_TYPES
 };
 
@@ -71,17 +73,27 @@ typedef union
 
 typedef void (* SCRIPT_CALLBACK)(char *szDisplay);
 
+struct DataSpace
+{
+	int Size;
+	char *Space;
+	char *Ptr;
+	DataSpace(int size);
+	~DataSpace();
+};
+
 class SCRIPT 
 {
 	int TotalRecord;
 	int	CurrentRecord;
 	SCRIPT_RECORD Msg[SCRIPT_MAX_RECORDS];
-	char Data[1024];
+	struct DataSpace *Data;
 	SCRIPT_CALLBACK pfnCallBack;
 	FILE *fp;
 	char linebuf[4096];		// for sparsing
 	int linenum;
 
+	bool IsDataSpace(int cnt) { return (Data->Size - (Data->Ptr - Data->Space) - cnt) >= 0; }
 	int FileLineNum(void)	{ return linenum; }
 	int FileOpen(char *filename) {	return ((fp = fopen(filename, "r")) == NULL) ? 0 : 1; }
 	void FileClose() { fclose(fp); }

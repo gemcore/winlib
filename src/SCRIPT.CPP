@@ -17,15 +17,27 @@
 ** 1.00 Nov-15-99 YH    Created.
 **============================================================================
 */
+#define _CRTDBG_MAP_ALLOC  
+#include <stdlib.h>  
+#include <crtdbg.h>  
+
+#ifdef _DEBUG
+#define DBG_NEW new ( _NORMAL_BLOCK , __FILE__ , __LINE__ )
+// Replace _NORMAL_BLOCK with _CLIENT_BLOCK if you want the
+// allocations to be of _CLIENT_BLOCK type
+#else
+#define DBG_NEW new
+#endif
 #include "script.hpp"
 
-#define TRACE	//printf
+#define TRACE	printf
 
 unsigned char *atobytes(char *s, unsigned char *bytes, int n);
 char *bytestoa(unsigned char *bytes, char *s, int n);
 
 SCRIPT_GRAMMER sg[]=
 {
+	"data",		SCRIPT_DATA,
 	"tx",		SCRIPT_TXCHAR,
 	"txfile",	SCRIPT_TXFILE,
 	"txvar",	SCRIPT_TXVAR,
@@ -36,15 +48,34 @@ SCRIPT_GRAMMER sg[]=
 	"exit",		SCRIPT_EXIT,
 	"label",	SCRIPT_LABEL,
 	"var",		SCRIPT_VAR,
-	"goto",		SCRIPT_GOTO
+	"goto",		SCRIPT_GOTO,
+	"test",		SCRIPT_TEST
 };
 
-char *toksep = " ;\t\n";
+char *toksep  = " ;\t\n";
 char *tokptr;
-char *tokval = " ,\t\n";
+char *tokval  = " ,\t\n";
 
-SCRIPT::SCRIPT(SCRIPT_CALLBACK pfnScr)
+DataSpace::DataSpace(int size)
+{ 
+	TRACE("DataSpace() called, ");
+	Size = size;						// Size of available space
+	Space = DBG_NEW char[Size];			// Start of space
+	Ptr = Space;						// First available position
+	TRACE(" Size=%d Space=%08x\n", Size, Space);
+}
+
+DataSpace::~DataSpace()
 {
+	TRACE("~DataSpace() called, Ptr=%08x\n",Ptr);
+	//ADG! delete Space;
+}
+
+SCRIPT::SCRIPT(SCRIPT_CALLBACK pfnScr) 
+{
+	TRACE("SCRIPT() called\n");
+	Data = NULL;
+
 	for (int i = 0; i < SCRIPT_MAX_RECORDS; i++)
 	{
 		Msg[i].pData = NULL;
@@ -57,6 +88,11 @@ SCRIPT::SCRIPT(SCRIPT_CALLBACK pfnScr)
 
 SCRIPT::~SCRIPT(void)
 {
+	TRACE("~SCRIPT() called\n");
+	if (Data)
+	{
+		delete Data;
+	}
 }
 
 int SCRIPT::Load(char *szFileName)
@@ -258,7 +294,6 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
     char *tp;
     SCRIPT_RECORD *ip=msg;
 	char szInfo[512];
-	char *p;
 	int rc = 0;
 	
 	linenum = 0;
@@ -272,10 +307,8 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
     sprintf(szInfo, "Reading messages from File %s", filename);
 	Display(szInfo);		
 
-	printf("sizeof(Data)=%d\n", sizeof(Data));
 	TotalRecord = 0;		// when reading failed, TotalRecord=0
 	CurrentRecord = 0;
-	p = Data;
 
 	while ((line = FileGetLine()) != NULL)
     {
@@ -294,15 +327,16 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 			if (!strcmp(tp, sg[SCRIPT_TXCHAR].szKey))
 			{
 				tp=strtok(NULL,toksep);
-				char *pDest = p;
+				char *pDest = Data->Ptr;
 				char *pSrc = tp;
 				cnt = 0;
 				while (*pSrc)
 				{
 					if (*pSrc != '\\')
 					{
+						cnt += 1;
+						if (!IsDataSpace(cnt)) goto errmem;
 						*pDest++ = *pSrc++;
-						if (++cnt >= sizeof(Data)) goto errmem;
 					}
 					else
 					{
@@ -328,9 +362,10 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 								rc = -3;
 								goto err;
 							}
+							cnt += 1;
+							if (!IsDataSpace(cnt)) goto errmem;
 							sscanf(szByte, "%02X", pDest);
 							pDest++;
-							if (++cnt >= sizeof(Data)) goto errmem;
 						}
 					}
 				}				
@@ -341,14 +376,14 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 			{
 				tp = strtok(NULL,toksep);
 				cnt = strlen(tp) + 1;
-				if (cnt >= sizeof(Data)) goto errmem;
-				strcpy(p, tp);
+				if (!IsDataSpace(cnt)) goto errmem;
+				strcpy(Data->Ptr, tp);
 				Msg[CurrentRecord].iType = sg[SCRIPT_TXFILE].iType;
 			}
 			else if (!strcmp(tp, sg[SCRIPT_TXVAR].szKey))
 			{
 				int n = 0;
-				char *pDest = p;
+				char *pDest = Data->Ptr;
 				/* Get next token. */
 				cnt = 0;
 				if ((tp = strtok(NULL, toksep)) != NULL)
@@ -358,7 +393,7 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 					while ((tp = strtok(NULL, tokval)) != NULL)
 					{
 						cnt += sizeof(int);
-						if (cnt >= sizeof(Data)) goto errmem;
+						if (!IsDataSpace(cnt)) goto errmem;
 						sscanf(tp, "%d", pDest);
 						TRACE("%s ", tp);
 						pDest += sizeof(int);
@@ -379,14 +414,15 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 				{
 					if (token == 0)
 					{
-						char *pDest = p;// Data[CurrentRecord].szWaitChars;
+						char *pDest = Data->Ptr;
 						char *pSrc = tp;
 						while (*pSrc)
 						{
 							if (*pSrc != '\\')
 							{
+								cnt += 1;
+								if (!IsDataSpace(cnt)) goto errmem;
 								*pDest++ = *pSrc++;
-								if (++cnt >= sizeof(Data)) goto errmem;
 							}
 							else
 							{
@@ -412,9 +448,10 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 										rc = -5;
 										goto err;
 									}
+									cnt += 1;
+									if (!IsDataSpace(cnt)) goto errmem;
 									sscanf(szByte, "%02X", pDest);
 									pDest++;
-									if (++cnt >= sizeof(Data)) goto errmem;
 								}
 							}
 						}
@@ -437,24 +474,24 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 			{
 				tp = strtok(NULL, toksep);
 				cnt = sizeof(int);
-				if (cnt >= sizeof(Data)) goto errmem;
-				sscanf(tp, "%d", p);
+				if (!IsDataSpace(cnt)) goto errmem;
+				sscanf(tp, "%d", Data->Ptr);
 				Msg[CurrentRecord].iType = sg[SCRIPT_SKIP].iType;
 			}
 			else if (!strcmp(tp, sg[SCRIPT_DELAY].szKey))
 			{
 				tp = strtok(NULL,toksep);
 				cnt = sizeof(int);
-				if (cnt >= sizeof(Data)) goto errmem;
-				sscanf(tp, "%d", p);
+				if (!IsDataSpace(cnt)) goto errmem;
+				sscanf(tp, "%d", Data->Ptr);
 				Msg[CurrentRecord].iType = sg[SCRIPT_DELAY].iType;
 			}
 			else if (!strcmp(tp, sg[SCRIPT_TIMEOUT].szKey))
 			{
 				tp = strtok(NULL,toksep);
 				cnt = sizeof(int);
-				if (cnt >= sizeof(Data)) goto errmem;
-				sscanf(tp, "%d", p);
+				if (!IsDataSpace(cnt)) goto errmem;
+				sscanf(tp, "%d", Data->Ptr);
 				Msg[CurrentRecord].iType = sg[SCRIPT_TIMEOUT].iType;
 			}
 			else if (!strcmp(tp, sg[SCRIPT_EXIT].szKey))
@@ -463,8 +500,8 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 				if (tp != NULL)
 				{
 					cnt = sizeof(int);
-					if (cnt >= sizeof(Data)) goto errmem;
-					sscanf(tp, "%d", p);
+					if (!IsDataSpace(cnt)) goto errmem;
+					sscanf(tp, "%d", Data->Ptr);
 				}
 				else
 				{
@@ -484,7 +521,7 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 			else  if (!strcmp(tp, sg[SCRIPT_VAR].szKey))
 			{
 				int n = 0;
-				char *pDest = p;
+				char *pDest = Data->Ptr;
 
 				/* Get next token. */
 				cnt = 0;
@@ -495,7 +532,7 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 					while ((tp = strtok(NULL, tokval)) != NULL)
 					{
 						cnt += sizeof(int);
-						if (cnt >= sizeof(Data)) goto errmem;
+						if (!IsDataSpace(cnt)) goto errmem;
 						sscanf(tp, "%d", pDest);
 						TRACE("%s ", tp);
 						pDest += sizeof(int);
@@ -509,7 +546,7 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 			{
 				int token = 0;
 				int n = 0;
-				char *pDest = p;
+				char *pDest = Data->Ptr;
 
 				/* Get next token. */
 				cnt = 0;
@@ -522,7 +559,7 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 					else
 					{
 						cnt += sizeof(int);
-						if (cnt >= sizeof(Data)) goto errmem;
+						if (!IsDataSpace(cnt)) goto errmem;
 						sscanf(tp, "%d", pDest);
 						pDest += sizeof(int);
 					}
@@ -531,16 +568,61 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 				Msg[CurrentRecord].iType = sg[SCRIPT_GOTO].iType;
 				Msg[CurrentRecord].iNext = n;
 			}
+			else  if (!strcmp(tp, sg[SCRIPT_TEST].szKey))
+			{
+				int token = 0;
+				int n = 0;
+				char *pDest = Data->Ptr;
+
+				/* Get next token. */
+				cnt = 0;
+				while ((tp = strtok(NULL, toksep)) != NULL)
+				{
+					if (token == 0)
+					{
+						sscanf(tp, "%d", &n);
+					}
+					else
+					{
+						cnt += sizeof(int);
+						if (!IsDataSpace(cnt)) goto errmem;
+						sscanf(tp, "%d", pDest);
+						pDest += sizeof(int);
+					}
+					token++;
+				}
+				Msg[CurrentRecord].iType = sg[SCRIPT_TEST].iType;
+				Msg[CurrentRecord].iNext = n;
+			}
+			else  if (!strcmp(tp, sg[SCRIPT_DATA].szKey))
+			{
+				/* The 'data' script is a directive and must be located at the beginning. */
+				if (CurrentRecord == 0)
+				{
+					/* Make sure there is only one directive. */
+					if (Data == NULL)
+					{
+						int n;
+						tp = strtok(NULL, toksep);
+						sscanf(tp, "%d", &n);
+						Data = DBG_NEW DataSpace(n);
+						continue;
+					}
+				}
+				sprintf(szInfo, "Invalid data directive");
+				rc = -6;
+				goto err;
+			}
 			else
 			{
 				sprintf(szInfo, "Incorrect Message Type %s", tp);
-				rc = -6;
+				rc = -7;
 				goto err;
 			}
         }
 		Msg[CurrentRecord].iLen = cnt;
-		Msg[CurrentRecord].pData = p;
-		p += cnt;
+		Msg[CurrentRecord].pData = Data->Ptr;
+		Data->Ptr += cnt;
 
 		if (++CurrentRecord >= MaxMsgCnt)
         {
@@ -551,8 +633,7 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
     }
 
 	TotalRecord = CurrentRecord;
-	sprintf(szInfo, "Total messages %d Ok", TotalRecord);
-exit:
+	sprintf(szInfo, "Total of %d messages, bytes %d used / %d remaining", TotalRecord, Data->Ptr - Data->Space, Data->Size - (Data->Ptr - Data->Space));
 	Display(szInfo);
 	FileClose();
 	return rc;
