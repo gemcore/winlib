@@ -87,8 +87,6 @@ class SCRIPT
 	int TotalRecord;
 	int	CurrentRecord;
 	SCRIPT_RECORD Msg[SCRIPT_MAX_RECORDS];
-	struct DataSpace *Data;
-	SCRIPT_CALLBACK pfnCallBack;
 	FILE *fp;
 	char linebuf[4096];		// for sparsing
 	int linenum;
@@ -103,13 +101,18 @@ class SCRIPT
 	int ReadByte(BYTE *data);
 	int ReadByteArray(BYTE *data,int n);
 	void ReadError(char *msg);
-	void Display(char *szDisplay)	{ if( pfnCallBack ) pfnCallBack(szDisplay); }
+	void Display(char *s);
 
 public:
-	SCRIPT(SCRIPT_CALLBACK pfnScr);
+	struct DataSpace *Data;
+
+	SCRIPT();
 	~SCRIPT();
 
 	int Load(char *szFileName);
+	int Loadbin(char *szFilename);
+	int Savebin(char *szFilename);
+
 	SCRIPT_RECORD *GetMsg(int iNum);
 	int GetNextRecord(SCRIPT_RECORD *pRec);
 	int FindTypeRecord(int type, int next);
@@ -118,7 +121,6 @@ public:
 	int GetVar(int iNum, int *var, int i=0);
 	int SetVar(int iNum, int val);
 	int	GetTotalRecord(void) {return TotalRecord; }
-	void SetCallBack(SCRIPT_CALLBACK pfnScr) { pfnCallBack = pfnScr; }
 };
 
 #endif //#ifndef _SCRIPT_HPP 

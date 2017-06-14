@@ -52,6 +52,30 @@ SCRIPT_GRAMMER sg[]=
 	"test",		SCRIPT_TEST
 };
 
+/*
+
+var 0; 1, 2,3,4
+txvar 0
+txvar 0;0
+txvar 0;1,2,4
+var   0;0,1
+txvar 0;1,0
+var 2
+label 1
+test 1;0;2;1
+exit 3
+test 2;0;2;1
+exit 2
+exit 1
+test 1;0;1
+exit 0
+test 0;0;0
+label 2
+goto 1;0;0
+exit 4
+
+*/
+
 char *toksep  = " ;\t\n";
 char *tokptr;
 char *tokval  = " ,\t\n";
@@ -71,7 +95,20 @@ DataSpace::~DataSpace()
 	//ADG! delete Space;
 }
 
-SCRIPT::SCRIPT(SCRIPT_CALLBACK pfnScr) 
+/*
+** Function to display output from parsing the SCRIPT file.
+*/
+void SCRIPT::Display(char *s)
+{
+	printf("> ");
+	while (*s)
+	{
+		printf("%c", *s++);
+	}
+	putchar('\n');
+}
+
+SCRIPT::SCRIPT()
 {
 	TRACE("SCRIPT() called\n");
 	Data = NULL;
@@ -83,7 +120,6 @@ SCRIPT::SCRIPT(SCRIPT_CALLBACK pfnScr)
 	TotalRecord = 0;
 	CurrentRecord = 0;
 	linenum = 0;
-	pfnCallBack = pfnScr;	// function pointer to display a single line of "text"
 }
 
 SCRIPT::~SCRIPT(void)
@@ -98,6 +134,68 @@ SCRIPT::~SCRIPT(void)
 int SCRIPT::Load(char *szFileName)
 {
 	return ReadMsgFile(szFileName, Msg, SCRIPT_MAX_RECORDS);
+}
+
+#include "BASEFILE.HPP"
+
+int SCRIPT::Loadbin(char *szFilename)
+{
+	BASEFILE bf;
+	bf.InitReadFile(szFilename);
+	if (!bf.IsFile())
+	{
+		Display("Loadbin File_Not_Found!\n");
+		return -1;
+	}
+	bf.ReadfromFile(sizeof(int), (BYTE *)&TotalRecord);
+	TRACE("Loadbin TotalRecord=%d ", TotalRecord);
+	int Size = bf.Filesize() - (TotalRecord * sizeof(SCRIPT_RECORD));
+	TRACE("Size=%d\n", Size);
+	Data = DBG_NEW DataSpace(Size - sizeof(int));
+
+	for (int i = 0; i < TotalRecord; i++)
+	{
+		SCRIPT_RECORD rec;
+		bf.ReadfromFile(sizeof(SCRIPT_RECORD), (BYTE *)&rec);
+		TRACE("Msg[%02d] iType=%-4d iLen=%-4d iNext=%-4d pData=%08x\n", i, Msg[i].iType, Msg[i].iLen, Msg[i].iNext, Msg[i].pData);
+		rec.pData = (void *)(Data->Space + (INT)rec.pData);
+		memcpy((BYTE *)&Msg[i], (BYTE *)&rec, sizeof(SCRIPT_RECORD));
+	}
+	bf.ReadfromFile(Data->Size, (BYTE *)Data->Space);
+	bf.CloseFile();
+	CurrentRecord = 0;
+	return 0;
+}
+
+int SCRIPT::Savebin(char *szFilename)
+{
+	BASEFILE bf;
+	bf.InitWriteFile(szFilename);
+	if (!bf.IsFile())
+	{
+		Display("Savebin File_Not_Found!\n");
+		return -1;
+	}
+	TRACE("Savebin TotalRecord=%d ", TotalRecord);
+	bf.WritetoFile(sizeof(int), (BYTE *)&TotalRecord);
+	TRACE("Size=%d\n", Data->Size);
+	for (int i = 0; i < TotalRecord; i++)
+	{
+		SCRIPT_RECORD rec;
+		memcpy((BYTE *)&rec, (BYTE *)&Msg[i], sizeof(SCRIPT_RECORD));
+		// Convert rec Data pointer to a offset value before writing to file.
+		rec.pData = (void *)((BYTE *)Msg[i].pData - (BYTE *)Data->Space);
+		TRACE("Msg[%02d] iType=%-4d iLen=%-4d iNext=%-4d pData=%08x\n", i, Msg[i].iType, Msg[i].iLen, Msg[i].iNext, Msg[i].pData);
+		bf.WritetoFile(sizeof(SCRIPT_RECORD), (BYTE *)&rec);
+	}
+	bf.WritetoFile(Data->Size, (BYTE *)Data->Space);
+	bf.CloseFile();
+	CurrentRecord = 0;
+	if (Data)
+	{
+		delete Data;
+	}
+	return 0;
 }
 
 SCRIPT_RECORD *SCRIPT::GetMsg(int iNum)
@@ -371,6 +469,7 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 				}				
 				*pDest=0;
 				Msg[CurrentRecord].iType = sg[SCRIPT_TXCHAR].iType;
+				Msg[CurrentRecord].iNext = 0;
 			}
 			else if (!strcmp(tp, sg[SCRIPT_TXFILE].szKey))
 			{
@@ -379,6 +478,7 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 				if (!IsDataSpace(cnt)) goto errmem;
 				strcpy(Data->Ptr, tp);
 				Msg[CurrentRecord].iType = sg[SCRIPT_TXFILE].iType;
+				Msg[CurrentRecord].iNext = 0;
 			}
 			else if (!strcmp(tp, sg[SCRIPT_TXVAR].szKey))
 			{
@@ -477,6 +577,7 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 				if (!IsDataSpace(cnt)) goto errmem;
 				sscanf(tp, "%d", Data->Ptr);
 				Msg[CurrentRecord].iType = sg[SCRIPT_SKIP].iType;
+				Msg[CurrentRecord].iNext = 0;
 			}
 			else if (!strcmp(tp, sg[SCRIPT_DELAY].szKey))
 			{
@@ -485,6 +586,7 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 				if (!IsDataSpace(cnt)) goto errmem;
 				sscanf(tp, "%d", Data->Ptr);
 				Msg[CurrentRecord].iType = sg[SCRIPT_DELAY].iType;
+				Msg[CurrentRecord].iNext = 0;
 			}
 			else if (!strcmp(tp, sg[SCRIPT_TIMEOUT].szKey))
 			{
@@ -493,6 +595,7 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 				if (!IsDataSpace(cnt)) goto errmem;
 				sscanf(tp, "%d", Data->Ptr);
 				Msg[CurrentRecord].iType = sg[SCRIPT_TIMEOUT].iType;
+				Msg[CurrentRecord].iNext = 0;
 			}
 			else if (!strcmp(tp, sg[SCRIPT_EXIT].szKey))
 			{
@@ -508,6 +611,7 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 					cnt = 0;
 				}
 				Msg[CurrentRecord].iType = sg[SCRIPT_EXIT].iType;
+				Msg[CurrentRecord].iNext = 0;
 			}
 			else  if (!strcmp(tp, sg[SCRIPT_LABEL].szKey))
 			{
