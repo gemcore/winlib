@@ -1,37 +1,41 @@
 <!--
 #
-# winlib: A simple Windows development library
-#
 # Alan Graves <agraves@gemcore.com>	
 # 2017-06-14
 #
-# This code started out a long time ago as an embedded x86 runtime library.
-# The basic classes developed formed a common framework that I found myself
-# repeatedly using to development various resource-constrained systems. 
-# There is a minimalistic interface to the underlying hardware and only the
-# essential peripheral components common to all platforms is supported.
-#
 -->
+
+# Introduction
+
+winlib: A Simple Windows Development Library
+
+This code started out a long time ago as an embedded runtime library that
+ran on a 80x86 (AMD MCUs), DOS and later on early Windows (16/32bit). The 
+basic classes formed a common framework that I found myself repeatedly 
+porting during the development of various resource-constrained systems. 
+There has always been a minimalistic interface to the underlying hardware 
+because only the essential peripherals common to all platforms was supported.
 
 # Overview 
 
-It's goal is to make it easy to develop applications for any typical 
-microcontroller environment. It currently supports only Windows platforms,
-however it should be relatively easy to port to other platforms as needed.
+The goal is to make it easy to develop applications for a typical operating
+system environment, processor or microcontroller environment. Currently the 
+code is for a Windows 10 platform, however it should be relatively easy to 
+port to other platforms such as Linux or ARM Cortex Mx as needed.
 
 The following functionality is supported:
 
-* Active objects:
-** Thread (Suspend, Resume, Sleep)
-** Mutex (Acquire, Release)
-** Lock
-** Event (Release, Wait)
-** TrafficLight (GreenLight, RedLight, Wait)
-* Timers
-* Serial I/O
+* Pre-emptive active objects:
+ - Thread (Suspend, Resume, Sleep)
+ - Mutex (Acquire, Release)
+ - Lock
+ - Event (Release, Wait)
+ - TrafficLight (GreenLight, RedLight, Wait)
+* Timer (Periodic or Single Flags or Functions)
+* Serial communications
 * File I/O (Basic)
 * Circular buffer
-* Printf
+* Console printf 
 * Simple SCRIPT language parser/compiler
 
 For more information on the Mynewt OS, please visit our website [here](https://mynewt.apache.org/).
@@ -48,8 +52,8 @@ winlib is being actively developed and used on projects. Some of the features be
 for the future are as follows:
 
 * Simple SCRIPT interpreter
+* Console input/output
 * Proto Threads for non-OS use
-* Console interface
 * Database
 
 # Suggestions

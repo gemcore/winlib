@@ -52,6 +52,7 @@ typedef struct
 typedef struct
 {   
    SCRIPT_TYPE iType;		// type
+   int iNum;				// line number (only needed for reporting)
    int iLen;				// not include itself and MsgType
    int iNext;				// next record if > 0
    void *pData;				// pointer to data
@@ -119,8 +120,9 @@ public:
 	void SetRecord(int iNum);
 	int GetRecord(void);
 	int GetVar(int iNum, int *var, int i=0);
-	int SetVar(int iNum, int val);
-	int	GetTotalRecord(void) {return TotalRecord; }
+	int SetVar(int iNum, int val, int i=0);
+	int GetCurrentRecord(void) { return CurrentRecord; }
+	int	GetTotalRecord(void) { return TotalRecord; }
 };
 
 #endif //#ifndef _SCRIPT_HPP 
