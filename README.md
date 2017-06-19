@@ -38,9 +38,6 @@ The following functionality is supported:
 * Console printf 
 * Simple SCRIPT language parser/compiler
 
-For more information on the Mynewt OS, please visit our website [here](https://mynewt.apache.org/).
-If you'd like to get started, visit the [Quick Start Guide](http://mynewt.apache.org/quick-start/).
-
 # Testing
 
 In addition to the core classes, there is a simple Windows Console application (winlib.cpp) that 
@@ -66,5 +63,5 @@ of what you would like to see.
 
 # License
 
-See the LICENSE file for more information.
+See the LICENSE file for more information (TBD).
 

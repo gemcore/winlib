@@ -477,7 +477,7 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 			else if (!strcmp(tp, sg[SCRIPT_TXFILE].szKey))
 			{
 				/* Get next token. */
-				tp = strtok(NULL,toksep);
+				tp = strtok(NULL,tokeol);
 				cnt = strlen(tp) + 1;
 				if (!IsDataSpace(cnt)) goto errmem;
 				strcpy(Data->Ptr, tp);
