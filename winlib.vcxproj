@@ -148,6 +148,7 @@
     <ClInclude Include="src\CIRCBUF.HPP" />
     <ClInclude Include="src\comport.h" />
     <ClInclude Include="src\GENERIC.HPP" />
+    <ClInclude Include="src\LOG.HPP" />
     <ClInclude Include="src\SCRIPT.HPP" />
     <ClInclude Include="src\SYSERR.H" />
     <ClInclude Include="src\Thread.h" />
@@ -165,6 +166,7 @@
     <ClCompile Include="src\BASEFILE.CPP" />
     <ClCompile Include="src\CIRCBUF.CPP" />
     <ClCompile Include="src\comport.cpp" />
+    <ClCompile Include="src\LOG.CPP" />
     <ClCompile Include="src\SCRIPT.CPP" />
     <ClCompile Include="src\TIMER.CPP" />
     <ClCompile Include="src\TMR.CPP" />

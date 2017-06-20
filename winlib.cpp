@@ -6,13 +6,39 @@
 #include "src\comport.h"
 #include "src\tmr.h"
 
-#define TRACE	printf
+//#undef printf
+#define printf(fmt, ...)  do{ if (log) log->Printf(fmt, __VA_ARGS__); }while(0)
+#define TRACE(fmt, ...)   do{ if (log) log->Printf(fmt, __VA_ARGS__); }while(0)
 
-ComPort com(3, CBR_115200);
+int Port = 3;
+
+ComPort com(Port, CBR_115200);
 
 int rxpacket_len = 0;
 int rxpacket_cnt = 0;
 byte rxpacket[80];
+
+#include "src\LOG.HPP"
+
+LogToFile *log = NULL;
+
+void CloseLog(void)
+{
+	if (log)
+	{
+		delete log;
+		log = NULL;
+	}
+}
+
+void OpenLog(void)
+{
+	CloseLog();
+
+	char filename[80];
+	sprintf(filename, "C:\\Comm%02d.txt", Port);
+	log = new LogToFile(filename);
+}
 
 /*
 ** ComPort virtual thread processing function.
@@ -128,6 +154,11 @@ void TxScript::Run()
 
 	while (bSuccess && pScript->GetNextRecord(&rec))
 	{
+		if (log)
+		{
+			log->Flush();
+		}
+
 		if (_isDying)
 		{
 			printf("%s: Aborted!\n", getname());
@@ -522,13 +553,16 @@ void TxScript::Run()
 			i = pScript->FindTypeRecord(SCRIPT_LABEL, rec.iNext);
 			if (i >= 0)
 			{
-				int var = -1;
-				int val = 0;
-				int inc = 0;
-				int j;
 				if (rec.iLen >= 4)
 				{
+					int var = -1;
+					int val = 0;
+					int inc = 0;
+					int j;
+					int idx;
 					var = pRecData->iArray[0];
+					idx = var >> 16;
+					var &= 0xFFFF;
 					j = pScript->FindTypeRecord(SCRIPT_VAR, var);
 					if (j >= 0)
 					{
@@ -540,16 +574,16 @@ void TxScript::Run()
 								inc = pRecData->iArray[2];
 							}
 						}
-						pScript->GetVar(j, &var);
-						TRACE("var (%d", var);
-						if (var == val)
+						pScript->GetVar(j, &var, idx);
+						TRACE(" var (%d", var);
+						if (var >= val)
 						{
-							TRACE("==%d) continue\n", val);
+							TRACE(">=%d) continue\n", val);
 						}
 						else
 						{
-							TRACE("!=%d) inc=%d, new val=%d, goto record %d\n", val, inc, var + inc, i);
-							pScript->SetVar(j, var + inc);
+							TRACE("< %d) inc=%d, new val=%d,  goto record %d\n", val, inc, var + inc, i);
+							pScript->SetVar(j, var + inc, idx);
 							pScript->SetRecord(i);		// Goto to record
 						}
 					}
@@ -560,6 +594,11 @@ void TxScript::Run()
 						bSuccess = false;
 						break;
 					}
+				}
+				else
+				{
+					TRACE(" goto record %d\n", i);
+					pScript->SetRecord(i);		// Goto to record
 				}
 			}
 			else
@@ -581,7 +620,6 @@ void TxScript::Run()
 			{
 				printf("%d,", pRecData->iArray[i]);
 			}
-			printf("\n");
 
 			// test and skip over records if variable meets condition
 			int var = -1;
@@ -590,7 +628,10 @@ void TxScript::Run()
 			int j;
 			if (rec.iLen >= 4)
 			{
+				int idx;
 				var = pRecData->iArray[0];
+				idx = var >> 16;
+				var &= 0xFFFF;
 				j = pScript->FindTypeRecord(SCRIPT_VAR, var);
 				if (j >= 0)
 				{
@@ -602,16 +643,21 @@ void TxScript::Run()
 							inc = pRecData->iArray[2];
 						}
 					}
-					pScript->GetVar(j, &var);
-					TRACE("var (%d", var);
+					pScript->GetVar(j, &var, idx);
+					TRACE(" var (%d", var);
 					if (var == val)
 					{
-						TRACE("==%d) contine\n", val);
+						TRACE("==%d) continue\n", val);
 					}
 					else
 					{
-						TRACE("!=%d) inc=%d, new val=%d, skip %d records\n", val, inc, var + inc, rec.iNext);
-						pScript->SetVar(j, var + inc);
+						TRACE("!=%d), ", val);
+						if (rec.iLen >= 12)
+						{
+							TRACE("new val=%d, ", inc);
+							pScript->SetVar(j, inc, idx);
+						}
+						TRACE("skip %d records\n", rec.iNext);
 						pScript->SetRecord(pScript->GetRecord() + rec.iNext);	// Skip over records
 					}
 				}
@@ -680,8 +726,9 @@ void MEM_Dump(unsigned char *data, int len, long base)
 		{
 			if ((i + j) < len)
 			{
-				if (isprint(data[i + j]))
-					printf("%c", data[i + j]);
+				int c = data[i + j] & 0xFF;
+				if (isprint(c))
+					printf("%c", c);
 				else
 					printf(".");
 			}
@@ -706,6 +753,9 @@ int main()
 		exit(-1);
 	}
 	com.Resume();
+
+	// Open capture log file as required.
+	OpenLog();
 
 	SCRIPT *sp = new SCRIPT();
 
@@ -763,7 +813,17 @@ int main()
 #endif
 	TMR_Term();
 
-	printf("exiting\n");
+	printf("exit\n\n");
+
+	// Flush capture log file unwritten data.
+	if (log)
+	{
+		log->Flush();
+	}
+
+	// Close capture log file if open.
+	CloseLog();
+
 	return 0;
 }
 

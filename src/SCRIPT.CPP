@@ -32,6 +32,8 @@
 
 #define TRACE	printf
 
+extern void MEM_Dump(unsigned char *data, int len, long base);
+
 unsigned char *atobytes(char *s, unsigned char *bytes, int n);
 char *bytestoa(unsigned char *bytes, char *s, int n);
 
@@ -652,17 +654,17 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 				if ((tp = strtok(NULL, toksep)) != NULL)
 				{
 					sscanf(tp, "%d", &var);
-					TRACE("var %d:", var);
+					//TRACE("var %d:", var);
 					/* Get next token. */
 					while ((tp = strtok(NULL, tokval)) != NULL)
 					{
 						cnt += sizeof(int);
 						if (!IsDataSpace(cnt)) goto errmem;
 						sscanf(tp, "%d", pDest);
-						TRACE("%s,", tp);
+						//TRACE("%s,", tp);
 						pDest += sizeof(int);
 					}
-					TRACE("\n");
+					//TRACE("\n");
 				}
 				Msg[CurrentRecord].iType = sg[SCRIPT_VAR].iType;
 				Msg[CurrentRecord].iNext = var;
@@ -679,12 +681,37 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 					sscanf(tp, "%d", &label);
 				}
 				/* Get next token. */
-				while ((tp = strtok(NULL, tokval)) != NULL)
+				if ((tp = strtok(NULL, tokval)) != NULL)
 				{
+					int i;
 					cnt += sizeof(int);
 					if (!IsDataSpace(cnt)) goto errmem;
-					sscanf(tp, "%d", pDest);
+					/* Get next token. */
+					sscanf(tp, "%d", &i);
+					/* Look ahead, if a ':' character appears then expect a var number followed by an index number. */
+					char *p = strchr(tp, ':');
+					if (p != NULL)
+					{
+						/* skip past ':' character. */
+						p++;
+						if (*p != '\0')
+						{
+							int j;
+							j = atoi(p);
+							j <<= 16;
+							i = (i&0x0000FFFF) | (j&0xFFFF0000);
+						}
+					}
+					*((int *)pDest) = i;
 					pDest += sizeof(int);
+					/* Get next token. */
+					while ((tp = strtok(NULL, tokval)) != NULL)
+					{
+						cnt += sizeof(int);
+						if (!IsDataSpace(cnt)) goto errmem;
+						sscanf(tp, "%d", pDest);
+						pDest += sizeof(int);
+					}
 				}
 				Msg[CurrentRecord].iType = sg[SCRIPT_GOTO].iType;
 				Msg[CurrentRecord].iNext = label;
@@ -700,12 +727,38 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 				{
 					sscanf(tp, "%d", &label);
 				}
-				while ((tp = strtok(NULL, toksep)) != NULL)
+				/* Get next token. */
+				if ((tp = strtok(NULL, tokval)) != NULL)
 				{
+					int i;
 					cnt += sizeof(int);
 					if (!IsDataSpace(cnt)) goto errmem;
-					sscanf(tp, "%d", pDest);
+					/* Get next token. */
+					sscanf(tp, "%d", &i);
+					/* Look ahead, if a ':' character appears then expect a var number followed by an index number. */
+					char *p = strchr(tp, ':');
+					if (p != NULL)
+					{
+						/* skip past ':' character. */
+						p++;
+						if (*p != '\0')
+						{
+							int j;
+							j = atoi(p);
+							j <<= 16;
+							i = (i & 0x0000FFFF) | (j & 0xFFFF0000);
+						}
+					}
+					*((int *)pDest) = i;
 					pDest += sizeof(int);
+					/* Get next token. */
+					while ((tp = strtok(NULL, tokval)) != NULL)
+					{
+						cnt += sizeof(int);
+						if (!IsDataSpace(cnt)) goto errmem;
+						sscanf(tp, "%d", pDest);
+						pDest += sizeof(int);
+					}
 				}
 				Msg[CurrentRecord].iType = sg[SCRIPT_TEST].iType;
 				Msg[CurrentRecord].iNext = label;

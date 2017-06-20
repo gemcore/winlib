@@ -29,7 +29,7 @@ BASEFILE::BASEFILE(char *szBaseName)
 	InitFile(szBaseName);
 }
 
-BASEFILE::BASEFILE(BOOL b_ReadFile, char *szBaseName)
+BASEFILE::BASEFILE(bool b_ReadFile, char *szBaseName)
 {
 	hbase = INVALID_HANDLE_VALUE;
 	if (b_ReadFile)
@@ -185,7 +185,12 @@ BOOL BASEFILE::WritetoFile(BYTE byte)
 	if (IsFile())
 	{
 		DWORD len;
-    
+		if (byte == '\n')
+		{
+			BYTE b;
+			b = '\r';
+			WriteFile(hbase, &b, 1, &len, 0);
+		}
 		return WriteFile(hbase, &byte, 1, &len, 0);
 	}
 	return FALSE;

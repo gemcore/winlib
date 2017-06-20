@@ -44,7 +44,7 @@ public:
 
 	BASEFILE();
     BASEFILE(char *szBaseName);
-	BASEFILE(BOOL b_ReadFile, char *szBaseName);
+	BASEFILE(bool b_ReadFile, char *szBaseName);
 	
 	~BASEFILE();
 
