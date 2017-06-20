@@ -69,7 +69,7 @@
     <ClInclude Include="src\TMR.H">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\LOG.HPP">
+    <ClInclude Include="src\LOG.H">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -148,7 +148,7 @@
     <ClInclude Include="src\CIRCBUF.HPP" />
     <ClInclude Include="src\comport.h" />
     <ClInclude Include="src\GENERIC.HPP" />
-    <ClInclude Include="src\LOG.HPP" />
+    <ClInclude Include="src\LOG.H" />
     <ClInclude Include="src\SCRIPT.HPP" />
     <ClInclude Include="src\SYSERR.H" />
     <ClInclude Include="src\Thread.h" />

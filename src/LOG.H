@@ -29,12 +29,16 @@
 **============================================================================
 */
 
-#ifndef LOG_HPP
-#define LOG_HPP
+#ifndef LOG_H
+#define LOG_H
 
 #include <string.h>
 #include <stdarg.h>
 #include "BASEFILE.HPP"
+
+#define putchar(c)	      do{ if (log) log->PutChar(c); }while(0)
+#define printf(fmt, ...)  do{ if (log) log->Printf(fmt, __VA_ARGS__); }while(0)
+#define TRACE(fmt, ...)   do{ if (log) log->Printf(fmt, __VA_ARGS__); }while(0)
 
 /*==========================================================================
 |
@@ -42,20 +46,27 @@
 |
 ===========================================================================*/
 
-class LogToFile : BASEFILE
+class LOG : BASEFILE
 {
-   int fh;
    int bflag;
 
 public:
-	LogToFile(char *filename, int flag=1);
-   ~LogToFile();
+	LOG(char *filename, int flag=1);
+   ~LOG();
    
    void Flush(void);
    void PutChar(int c);
    void PutStr(char *s);
    int Printf(const char *format,...);
 };
+
+extern LOG *log;
+
+extern "C"
+{
+	void LOG_Init(char *filename);
+	void LOG_Term(void);
+}
 
 #endif
 

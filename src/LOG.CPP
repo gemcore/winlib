@@ -13,11 +13,13 @@
 **
 **============================================================================
 */
+#include "log.h"
+#undef putchar
+#undef printf
 #define _INC_STDIO
 #include <stdio.h>                  /* C Standard I/O definitions */
 #include <stdarg.h>                 /* C ANSI standard variable args macros */
 #include "syserr.h"
-#include "log.hpp"
 
 /*==========================================================================
 |
@@ -30,23 +32,26 @@
 |  class methods
 |
 ===========================================================================*/
-LogToFile::LogToFile(char *filename, int flag) : BASEFILE(false, filename),
+LOG::LOG(char *filename, int flag) : BASEFILE(false, filename),
 	bflag(flag)
 {
 }
 
-LogToFile::~LogToFile()
+LOG::~LOG()
 {
 	Flush();                         // flush buffer
 }
 
-void LogToFile::PutChar(int c)
+void LOG::PutChar(int c)
 {  
-	putchar(c);
+	/* Log character to the file. */
 	BASEFILE::WritetoFile((BYTE)c);
+
+	/* Out character to the console. */
+	putchar(c);
 }
 
-void LogToFile::PutStr(char *s)
+void LOG::PutStr(char *s)
 {
 	while (*s)
 	{
@@ -54,7 +59,7 @@ void LogToFile::PutStr(char *s)
 	}
 }
 
-int LogToFile::Printf(const char *format, ...)
+int LOG::Printf(const char *format, ...)
 {
 	va_list arg_ptr;
 	va_start(arg_ptr, format);
@@ -65,15 +70,43 @@ int LogToFile::Printf(const char *format, ...)
 	return num_chars;
 }
 
-void LogToFile::Flush(void)
+void LOG::Flush(void)
 {
+	FlushFileBuffers(BASEFILE::hbase);
+}
+
+LOG *log = NULL;
+
+extern "C"
+{
+	void LOG_Init(char *filename)
+	{
+		if (log == NULL)
+		{
+			log = new LOG(filename);
+			if (log)
+			{
+				puts("LOG_Init\n");
+			}
+		}
+	}
+
+	void LOG_Term(void)
+	{
+		if (log)
+		{
+			puts("LOG_Term\n");
+			delete log;
+			log = NULL;
+		}
+	}
 }
 
 #ifdef __TESTING_LOG__
 
 void main()
 {
-   LogToFile log("LOG.LOG");
+   LOG log("log.txt");
 
    log.Printf("\nThis is written to the log file.");
    log.Flush();

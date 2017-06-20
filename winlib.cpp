@@ -3,42 +3,19 @@
 
 #include "stdafx.h"
 #include "windows.h"
+#include "src\LOG.H"		// Capture putchar & printf output to a log file
+#include "src\TMR.H"
 #include "src\comport.h"
-#include "src\tmr.h"
 
-//#undef printf
-#define printf(fmt, ...)  do{ if (log) log->Printf(fmt, __VA_ARGS__); }while(0)
-#define TRACE(fmt, ...)   do{ if (log) log->Printf(fmt, __VA_ARGS__); }while(0)
+#define RUN_TESTING
+//#define COM_TESTING
+//#define TMR_TESTING
 
-int Port = 3;
-
-ComPort com(Port, CBR_115200);
+ComPort com(3, CBR_115200);
 
 int rxpacket_len = 0;
 int rxpacket_cnt = 0;
 byte rxpacket[80];
-
-#include "src\LOG.HPP"
-
-LogToFile *log = NULL;
-
-void CloseLog(void)
-{
-	if (log)
-	{
-		delete log;
-		log = NULL;
-	}
-}
-
-void OpenLog(void)
-{
-	CloseLog();
-
-	char filename[80];
-	sprintf(filename, "C:\\Comm%02d.txt", Port);
-	log = new LogToFile(filename);
-}
 
 /*
 ** ComPort virtual thread processing function.
@@ -70,14 +47,57 @@ int send_char(byte c)
 	return 0;
 }
 
-class ATmr : CTimerFunc
-{
-	void Func(void)
-	{
-		printf(".");
-	}
-};
+/*
+**
+*/
+#include <ctype.h>
 
+char dflag = 1;
+
+void MEM_Dump(unsigned char *data, int len, long base)
+{
+	int i, j;
+
+	if (!dflag)
+		return;
+
+	//printf("MEM: @%08x len=%04x\n",data,len);
+	for (i = 0; i < len; i += 16)
+	{
+		printf(" %06x: ", base + i);
+		for (j = 0; j < 16; j++)
+		{
+			if (j != 0)
+			{
+				if (!(j % 8))
+					putchar(' ');
+				if (!(j % 1))
+					putchar(' ');
+			}
+			if ((i + j) < len)
+				printf("%02x", data[i + j]);
+			else
+				printf("  ");
+		}
+		printf("  ");
+		for (j = 0; j < 16 && (i + j) < len; j++)
+		{
+			if ((i + j) < len)
+			{
+				int c = data[i + j] & 0xFF;
+				if (isprint(c))
+					putchar(c);
+				else
+					putchar('.');
+			}
+			else
+				putchar(' ');
+		}
+		putchar('\n');
+	}
+}
+
+#ifdef RUN_TESTING
 /*
 ** A simple SCRIPTing language based thread for processing serial output and input data.
 */
@@ -222,7 +242,7 @@ void TxScript::Run()
 						{
 							putchar('\n');
 						}
-						printf("%s: [%d] Val_Undefined!\n", getname(), k);
+						printf("\n%s: [%d] Val_Undefined!\n", getname(), k);
 						Result = TXSCRIPT_VAL_UNDEFINED;
 						bSuccess = false;
 						break;
@@ -238,7 +258,7 @@ void TxScript::Run()
 			}
 			else
 			{
-				printf("%s: [%d] Var_Not_Found!\n", getname(), rec.iNext);
+				printf("\n%s: [%d] Var_Not_Found!\n", getname(), rec.iNext);
 				Result = TXSCRIPT_VAR_NOT_FOUND;
 				bSuccess = false;
 				break;
@@ -332,12 +352,12 @@ void TxScript::Run()
 					int i = pScript->FindTypeRecord(SCRIPT_LABEL, rec.iNext);
 					if (i >= 0)
 					{
-						TRACE(" goto record %d\n", i);
+						TRACE("\tgoto record %d\n", i);
 						pScript->SetRecord(i);
 					}
 					else
 					{
-						printf("%s: [%d] Label_Not_Found!\n", getname(), rec.iNext);
+						printf("\n%s: [%d] Label_Not_Found!\n", getname(), rec.iNext);
 						Result = TXSCRIPT_LABEL_NOT_FOUND;
 						bSuccess = false;
 						break;
@@ -396,23 +416,26 @@ void TxScript::Run()
 			printf("skip %d ", MaxCnt);
 			int j;
 			int var = -1;
+			int idx = 0;
 			if (rec.iLen > 4)
 			{
 				var = pRecData->iArray[1];
+				idx = var >> 16;
+				var &= 0xFFFF;
 			}
 			if (var != -1)
 			{
 				j = pScript->FindTypeRecord(SCRIPT_VAR, var);
 				if (j >= 0)
 				{
-					TRACE("var %d:", var);
+					TRACE("var %d@%d:", var, idx);
 				}
 			}
 			while (bSuccess && !bFound)
 			{
 				if (_isDying)
 				{
-					printf("%s: Aborted!\n", getname());
+					printf("\n%s: Aborted!\n", getname());
 					Result = TXSCRIPT_ABORTED;
 					bSuccess = false;
 					break;
@@ -432,12 +455,12 @@ void TxScript::Run()
 					int i = pScript->FindTypeRecord(SCRIPT_LABEL, rec.iNext);
 					if (i >= 0)
 					{
-						TRACE(" goto record %d\n", i);
+						TRACE("\tgoto record %d\n", i);
 						pScript->SetRecord(i);
 					}
 					else
 					{
-						printf("%s: [%d] Label_Not_Found!\n", getname(), rec.iNext);
+						printf("\n%s: [%d] Label_Not_Found!\n", getname(), rec.iNext);
 						Result = TXSCRIPT_LABEL_NOT_FOUND;
 						bSuccess = false;
 						break;
@@ -454,7 +477,7 @@ void TxScript::Run()
 					if (var != -1)
 					{
 						// Save char to variable array.
-						pScript->SetVar(j, c, Cnt);
+						pScript->SetVar(j, c, idx + Cnt);
 					}
 					Cnt++;
 					if (Cnt >= MaxCnt)
@@ -483,7 +506,7 @@ void TxScript::Run()
 					break;
 				}
 				Sleep(100L);
-				printf(".");
+				putchar('.');
 			}
 			putchar('\n');
 		}
@@ -532,9 +555,10 @@ void TxScript::Run()
 			int n = rec.iLen / sizeof(int);
 			for (i = 0; i < n; i++)
 			{
-				printf("%d,", pRecData->iArray[i]);
+				printf("%d", pRecData->iArray[i]);
+				putchar(((i + 1) < n) ? ',' : ' ');
 			}
-			printf("\n");
+			putchar('\n');
 		}
 		break;
 
@@ -546,7 +570,15 @@ void TxScript::Run()
 			int n = rec.iLen / sizeof(int);
 			for (i = 0; i < n; i++)
 			{
-				printf("%d,", pRecData->iArray[i]);
+				if (i > 0)
+				{
+					printf("%d", pRecData->iArray[i]);
+				}
+				else
+				{
+					printf("%d@%d", pRecData->iArray[i] & 0xFFFF, pRecData->iArray[i] >> 16);
+				}
+				putchar(((i + 1) < n) ? ',' : ' ');
 			}
 
 			// goto label record specified if variable meets condition
@@ -574,8 +606,9 @@ void TxScript::Run()
 								inc = pRecData->iArray[2];
 							}
 						}
+						TRACE("\t%d@%d=", var, idx);
 						pScript->GetVar(j, &var, idx);
-						TRACE(" var (%d", var);
+						TRACE("(%d", var);
 						if (var >= val)
 						{
 							TRACE(">=%d) continue\n", val);
@@ -597,13 +630,13 @@ void TxScript::Run()
 				}
 				else
 				{
-					TRACE(" goto record %d\n", i);
+					TRACE("\tgoto record %d\n", i);
 					pScript->SetRecord(i);		// Goto to record
 				}
 			}
 			else
 			{
-				TRACE("%s: [%d] Label_Not_Found!\n", getname(), rec.iNext);
+				TRACE("\n%s: [%d] Label_Not_Found!\n", getname(), rec.iNext);
 				Result = TXSCRIPT_LABEL_NOT_FOUND;
 				bSuccess = false;
 				break;
@@ -618,7 +651,15 @@ void TxScript::Run()
 			int n = rec.iLen / sizeof(int);
 			for (i = 0; i < n; i++)
 			{
-				printf("%d,", pRecData->iArray[i]);
+				if (i > 0)
+				{
+					printf("%d", pRecData->iArray[i]);
+				}
+				else
+				{
+					printf("%d@%d", pRecData->iArray[i]&0xFFFF, pRecData->iArray[i]>>16);
+				}
+				putchar(((i + 1) < n) ? ',' : ' ');
 			}
 
 			// test and skip over records if variable meets condition
@@ -643,8 +684,9 @@ void TxScript::Run()
 							inc = pRecData->iArray[2];
 						}
 					}
+					TRACE("\t%d@%d=", var, idx);
 					pScript->GetVar(j, &var, idx);
-					TRACE(" var (%d", var);
+					TRACE("(%d", var);
 					if (var == val)
 					{
 						TRACE("==%d) continue\n", val);
@@ -663,7 +705,7 @@ void TxScript::Run()
 				}
 				else
 				{
-					printf("%s: [%d] Var_Not_Found!\n", var);
+					printf("\n%s: [%d] Var_Not_Found!\n", var);
 					Result = TXSCRIPT_VAR_NOT_FOUND;
 					bSuccess = false;
 					break;
@@ -691,62 +733,29 @@ void TxScript::Run()
 	TMR_Delete(tmr);
 	e.Release();
 }
+#endif
 
-#include <ctype.h>
-
-char dflag = 1;
-
-void MEM_Dump(unsigned char *data, int len, long base)
+#ifdef TMR_TESTING
+class ATmr : CTimerFunc
 {
-	int i, j;
-
-	if (!dflag)
-		return;
-
-	//printf("MEM: @%08x len=%04x\n",data,len);
-	for (i = 0; i < len; i += 16)
+	void Func(void)
 	{
-		printf(" %06x: ", base + i);
-		for (j = 0; j < 16; j++)
-		{
-			if (j != 0)
-			{
-				if (!(j % 8))
-					printf(" ");
-				if (!(j % 1))
-					printf(" ");
-			}
-			if ((i + j) < len)
-				printf("%02x", data[i + j]);
-			else
-				printf("  ");
-		}
-		printf("  ");
-		for (j = 0; j < 16 && (i + j) < len; j++)
-		{
-			if ((i + j) < len)
-			{
-				int c = data[i + j] & 0xFF;
-				if (isprint(c))
-					printf("%c", c);
-				else
-					printf(".");
-			}
-			else
-				printf(" ");
-		}
-		printf("\n");
+		putchar('.');
 	}
-}
+};
 
-//ATmr atmr;
+ATmr atmr;
+#endif
 
 int main()
 {
+	// Open log file to capture output from putchar and printf macros.
+	LOG_Init("C:\\winlib.txt");
+
 	printf("winlib\n");
 
 	TMR_Init(100);	// 100ms timebase
-					
+
 	/* Serial port testing. */
 	if (!com.Start())
 	{
@@ -754,29 +763,29 @@ int main()
 	}
 	com.Resume();
 
-	// Open capture log file as required.
-	OpenLog();
-
+#ifdef RUN_TESTING
 	SCRIPT *sp = new SCRIPT();
-
-	/* Load and parse the SCRIPT messages from a file. */
-	int result = sp->Load("c:\\temp\\test.spt");
-	if (result == 0)
+	if (sp)
 	{
-		/* Initialize the TxScript processing. */
-		TxScript *txscript = new TxScript(&com);
+		/* Load and parse the SCRIPT messages from a file. */
+		int result = sp->Load("c:\\temp\\test.spt");
+		if (result == 0)
+		{
+			/* Initialize the TxScript processing. */
+			TxScript *txscript = new TxScript(&com);
 
-		result = txscript->RunScript(sp);
-		printf("result=%d\n", result);
+			result = txscript->RunScript(sp);
 
+			/* Terminate the TxScript thread. */
+			delete txscript;
+		}
 		MEM_Dump((unsigned char *)sp->Data->Space, sp->Data->Size, 0L);
-
-		/* Terminate the TxScript thread. */
-		delete txscript;
+		delete sp;
+		printf("result=%d\n", result);
 	}
-	delete sp;
+#endif
 
-#if 0
+#ifdef COM_TESTING
 	unsigned char buf[80];
 	com.Write("AT\r", 3);
 	com.Sleep(2000);
@@ -787,10 +796,11 @@ int main()
 		{
 			printf("%c", buf[i]);
 		}
-		printf("\n");
+		putchar('\n');
 	}
-	com.Stop();
+#endif
 
+#ifdef TMR_TESTING
 	/* Timer testing. */
 	printf("\nset 1 second timer ");
 	Tmr t = TMR_New();
@@ -798,7 +808,7 @@ int main()
 	while (!TMR_IsTimeout(t))
 	{
 		TMR_Delay(1);
-		printf(".");
+		putchar('.');
 	}
 	printf("done\n");
 
@@ -809,21 +819,17 @@ int main()
 	TMR_Delay(50);
 	printf("5 seconds ");
 	TMR_Event(0, (CTimerEvent *)&atmr, PERIODIC);
-	printf("\n");
+	putchar('\n');
 #endif
+
+	com.Stop();
 	TMR_Term();
 
 	printf("exit\n\n");
 
-	// Flush capture log file unwritten data.
-	if (log)
-	{
-		log->Flush();
-	}
-
-	// Close capture log file if open.
-	CloseLog();
-
+	// Close capture log file.
+	LOG_Term();
+	
 	return 0;
 }
 

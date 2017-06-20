@@ -20,6 +20,7 @@
 #define _CRTDBG_MAP_ALLOC  
 #include <stdlib.h>  
 #include <crtdbg.h>  
+#include "LOG.H"		// Capture putchar & printf output to a log file
 
 #ifdef _DEBUG
 #define DBG_NEW new ( _NORMAL_BLOCK , __FILE__ , __LINE__ )
@@ -31,8 +32,6 @@
 #include "script.hpp"
 
 #define TRACE	printf
-
-extern void MEM_Dump(unsigned char *data, int len, long base);
 
 unsigned char *atobytes(char *s, unsigned char *bytes, int n);
 char *bytestoa(unsigned char *bytes, char *s, int n);
@@ -85,16 +84,16 @@ char *tokptr;
 
 DataSpace::DataSpace(int size)
 { 
-	TRACE("DataSpace() called, ");
+	//TRACE("DataSpace() called, ");
 	Size = size;						// Size of available space
 	Space = DBG_NEW char[Size];			// Start of space
 	Ptr = Space;						// First available position
-	TRACE(" Size=%d Space=%08x\n", Size, Space);
+	//TRACE(" Size=%d Space=%08x\n", Size, Space);
 }
 
 DataSpace::~DataSpace()
 {
-	TRACE("~DataSpace() called, Ptr=%08x\n",Ptr);
+	//TRACE("~DataSpace() called, Ptr=%08x\n",Ptr);
 	//ADG! delete Space;
 }
 
@@ -108,12 +107,12 @@ void SCRIPT::Display(char *s)
 	{
 		printf("%c", *s++);
 	}
-	putchar('\n');
+	printf("\n");
 }
 
 SCRIPT::SCRIPT()
 {
-	TRACE("SCRIPT() called\n");
+	//TRACE("SCRIPT() called\n");
 	Data = NULL;
 
 	for (int i = 0; i < SCRIPT_MAX_RECORDS; i++)
@@ -127,7 +126,7 @@ SCRIPT::SCRIPT()
 
 SCRIPT::~SCRIPT(void)
 {
-	TRACE("~SCRIPT() called\n");
+	//TRACE("~SCRIPT() called\n");
 	if (Data)
 	{
 		delete Data;
@@ -688,11 +687,11 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 					if (!IsDataSpace(cnt)) goto errmem;
 					/* Get next token. */
 					sscanf(tp, "%d", &i);
-					/* Look ahead, if a ':' character appears then expect a var number followed by an index number. */
-					char *p = strchr(tp, ':');
+					/* Look ahead, if a '@' character appears then expect a var number followed by an index number. */
+					char *p = strchr(tp, '@');
 					if (p != NULL)
 					{
-						/* skip past ':' character. */
+						/* skip past '@' character. */
 						p++;
 						if (*p != '\0')
 						{
@@ -735,11 +734,11 @@ int SCRIPT::ReadMsgFile(char *filename, SCRIPT_RECORD *msg, int MaxMsgCnt )
 					if (!IsDataSpace(cnt)) goto errmem;
 					/* Get next token. */
 					sscanf(tp, "%d", &i);
-					/* Look ahead, if a ':' character appears then expect a var number followed by an index number. */
-					char *p = strchr(tp, ':');
+					/* Look ahead, if a '@' character appears then expect a var number followed by an index number. */
+					char *p = strchr(tp, '@');
 					if (p != NULL)
 					{
-						/* skip past ':' character. */
+						/* skip past '@' character. */
 						p++;
 						if (*p != '\0')
 						{
