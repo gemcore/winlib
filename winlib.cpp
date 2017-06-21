@@ -17,6 +17,8 @@ int rxpacket_len = 0;
 int rxpacket_cnt = 0;
 byte rxpacket[80];
 
+extern void MEM_Dump(unsigned char *data, int len, long base);
+
 /*
 ** ComPort virtual thread processing function.
 */
@@ -45,56 +47,6 @@ int send_char(byte c)
 {
 	com.Write(c);
 	return 0;
-}
-
-/*
-**
-*/
-#include <ctype.h>
-
-char dflag = 1;
-
-void MEM_Dump(unsigned char *data, int len, long base)
-{
-	int i, j;
-
-	if (!dflag)
-		return;
-
-	//printf("MEM: @%08x len=%04x\n",data,len);
-	for (i = 0; i < len; i += 16)
-	{
-		printf(" %06x: ", base + i);
-		for (j = 0; j < 16; j++)
-		{
-			if (j != 0)
-			{
-				if (!(j % 8))
-					putchar(' ');
-				if (!(j % 1))
-					putchar(' ');
-			}
-			if ((i + j) < len)
-				printf("%02x", data[i + j]);
-			else
-				printf("  ");
-		}
-		printf("  ");
-		for (j = 0; j < 16 && (i + j) < len; j++)
-		{
-			if ((i + j) < len)
-			{
-				int c = data[i + j] & 0xFF;
-				if (isprint(c))
-					putchar(c);
-				else
-					putchar('.');
-			}
-			else
-				putchar(' ');
-		}
-		putchar('\n');
-	}
 }
 
 #ifdef RUN_TESTING
@@ -160,19 +112,19 @@ private:
 
 void TxScript::Run()
 {
-	SCRIPT_RECORD rec;
-	RECDATA *pRecData;
+	SCRIPT_REC rec;
+	SCRIPT_RECDATA *pRecData;
 	BOOL bSuccess = true;
 
 	/* Define a processing timer. */
 	Tmr tmr = TMR_New();
-	int iTimeout = TMR_TIMEOUT_MAX;
-	TMR_Start(tmr, iTimeout);
+	int Timeout = TMR_TIMEOUT_MAX;
+	TMR_Start(tmr, Timeout);
 
 	TRACE("%s: Running...\n", getname());
 	pScript->SetRecord(0);
 
-	while (bSuccess && pScript->GetNextRecord(&rec))
+	while (bSuccess && pScript->GetNextRec(&rec))
 	{
 		if (log)
 		{
@@ -192,11 +144,11 @@ void TxScript::Run()
 		case SCRIPT_TXCHAR:
 		{
 			int c;
-			pRecData = (RECDATA*)(rec.pData);
-			printf("tx %d ", rec.iLen, pRecData->szTxChars);
+			pRecData = (SCRIPT_RECDATA*)(rec.pData);
+			printf("tx %d ", rec.iLen, pRecData->cArray);
 			for (int i = 0; i < rec.iLen; i++)
 			{
-				c = pRecData->szTxChars[i] & 0xFF;
+				c = pRecData->cArray[i] & 0xFF;
 				if (isprint(c))
 				{
 					putchar(c);
@@ -207,14 +159,14 @@ void TxScript::Run()
 				}
 			}
 			putchar('\n');
-			com->Write(pRecData->szTxChars, rec.iLen);
+			com->Write(pRecData->cArray, rec.iLen);
 		}
 		break;
 
 		case SCRIPT_TXVAR:
 		{
 			int c;
-			pRecData = (RECDATA*)(rec.pData);
+			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 			printf("txvar %d ", rec.iNext);
 			int n = rec.iLen / sizeof(int);
 			int j;
@@ -226,7 +178,7 @@ void TxScript::Run()
 					// Default val if not explicitly specified.
 					n = 1;
 				}
-				int m = pScript->GetMsg(j)->iLen;
+				int m = pScript->GetRec(j)->iLen;
 				if (m == 0)
 				{
 					// Default val if not explicitly specified.
@@ -273,11 +225,11 @@ void TxScript::Run()
 			long size;
 			BYTE buf[BUFSIZE];
 			int buflen;
-			pRecData = (RECDATA*)(rec.pData);
-			filename = pRecData->szFileName;	/* contains the Application image binary data. */
+			pRecData = (SCRIPT_RECDATA*)(rec.pData);
+			filename = pRecData->cArray;	/* the image filename */
 			bool bDone = false;
 			printf("txfile %s ", filename);
-			/* Determine the size of the application image. */
+			/* Determine the size of the image file. */
 			bf.InitReadFile(filename);
 			if (!bf.IsFile())
 			{
@@ -315,12 +267,12 @@ void TxScript::Run()
 
 		case SCRIPT_RXCHAR:
 		{
-			pRecData = (RECDATA*)(rec.pData);
+			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 
 			TMR_Stop(tmr);
-			if (iTimeout > 0)
+			if (Timeout > 0)
 			{
-				TMR_Start(tmr, iTimeout);
+				TMR_Start(tmr, Timeout);
 			}
 			int c;
 			int Cnt = 0;
@@ -367,7 +319,7 @@ void TxScript::Run()
 				}
 				while ((c = recv_char()) != -1)
 				{
-					if (c == (pRecData->szWaitChars[Cnt] & 0xFF))
+					if (c == (pRecData->cArray[Cnt] & 0xFF))
 					{
 						if (isprint(c))
 							putchar(c);
@@ -402,12 +354,12 @@ void TxScript::Run()
 
 		case SCRIPT_SKIP:
 		{
-			pRecData = (RECDATA*)(rec.pData);
+			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 
 			TMR_Stop(tmr);
-			if (iTimeout > 0)
+			if (Timeout > 0)
 			{
-				TMR_Start(tmr, iTimeout);
+				TMR_Start(tmr, Timeout);
 			}
 			int c;
 			int Cnt = 0;
@@ -494,10 +446,10 @@ void TxScript::Run()
 
 		case SCRIPT_DELAY:
 		{
-			pRecData = (RECDATA*)(rec.pData);
-			printf("delay %d", pRecData->iDelay);
+			pRecData = (SCRIPT_RECDATA*)(rec.pData);
+			printf("delay %d", pRecData->iValue);
 			int i;
-			for (i = 0; i < pRecData->iDelay; i++)
+			for (i = 0; i < pRecData->iValue; i++)
 			{
 				if (_isDying)
 				{
@@ -514,20 +466,20 @@ void TxScript::Run()
 
 		case SCRIPT_TIMEOUT:
 		{
-			pRecData = (RECDATA*)(rec.pData);
-			iTimeout = pRecData->iTimeout;
-			printf("timeout %d\n", iTimeout);
+			pRecData = (SCRIPT_RECDATA*)(rec.pData);
+			Timeout = pRecData->iValue;
+			printf("timeout %d\n", Timeout);
 			TMR_Stop(tmr);
-			if (iTimeout > 0)
+			if (Timeout > 0)
 			{
-				TMR_Start(tmr, iTimeout);
+				TMR_Start(tmr, Timeout);
 			}
 		}
 		break;
 
 		case SCRIPT_EXIT:
 		{
-			pRecData = (RECDATA*)(rec.pData);
+			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 			if (rec.iLen == 0)
 			{
 				Result = TXSCRIPT_EXIT;
@@ -537,7 +489,7 @@ void TxScript::Run()
 				Result = pRecData->iValue;
 			}
 			printf("exit %d\n", Result);
-			pScript->SetRecord(pScript->GetTotalRecord());
+			pScript->SetRecord(pScript->GetRecCount());
 		}
 		break;
 
@@ -549,7 +501,7 @@ void TxScript::Run()
 
 		case SCRIPT_VAR:
 		{
-			pRecData = (RECDATA*)(rec.pData);
+			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 			printf("var %d:", rec.iNext);
 			int i;
 			int n = rec.iLen / sizeof(int);
@@ -564,7 +516,7 @@ void TxScript::Run()
 
 		case SCRIPT_GOTO:
 		{
-			pRecData = (RECDATA*)(rec.pData);
+			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 			printf("goto %d,", rec.iNext);
 			int i;
 			int n = rec.iLen / sizeof(int);
@@ -645,7 +597,7 @@ void TxScript::Run()
 		}
 		case SCRIPT_TEST:
 		{
-			pRecData = (RECDATA*)(rec.pData);
+			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 			printf("test %d,", rec.iNext);
 			int i;
 			int n = rec.iLen / sizeof(int);
@@ -778,8 +730,25 @@ int main()
 
 			/* Terminate the TxScript thread. */
 			delete txscript;
+			SCRIPT_REC *r = sp->GetVarRecPtr(2);
+			if (r != NULL)
+			{
+				SCRIPT_RECDATA *d = (SCRIPT_RECDATA *)r->pData;
+				//MEM_Dump((unsigned char *)d->iArray, r->iLen, 0L);
+				printf("var 2:");
+				//for (int i = 0; i < 5; i++)
+				//{
+				//	printf("\\x%08X,", d->iArray[i]);
+				//}
+				//printf(" as char:");
+				for (int i = 0; i < 5; i++)
+				{
+					printf("%c,", (char)d->iArray[i]);
+				}
+				printf("\n");
+			}
 		}
-		MEM_Dump((unsigned char *)sp->Data->Space, sp->Data->Size, 0L);
+		sp->Dump();
 		delete sp;
 		printf("result=%d\n", result);
 	}
