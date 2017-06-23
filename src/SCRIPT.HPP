@@ -24,6 +24,7 @@
 #include <stdio.h>
 
 #define SCRIPT_MAX_REC		256
+#define SCRIPT_MAX_CALLS	8
 
 enum SCRIPT_TYPE
 {
@@ -41,9 +42,11 @@ enum SCRIPT_TYPE
 	SCRIPT_GOTO,			// 10 goto
 	SCRIPT_TEST,			// 11 test
 	SCRIPT_BUF,				// 12 buf
+	SCRIPT_CALL,			// 13 call
+	SCRIPT_RET, 			// 14 call
 
 	/* Special tokens. */
-	SCRIPT_LABEL,			// 13 label
+	SCRIPT_LABEL,			// 15 label
 };
 
 typedef struct
@@ -54,8 +57,9 @@ typedef struct
 typedef struct
 {   
    SCRIPT_TYPE iType;		// type
+   char bFmt[2];			// data format info (eg. for 'var' type 0=int, 1=byte)
    int iNum;				// line number (only needed for reporting)
-   int iLen;				// not include itself and Rec Type
+   int iLen;				// length of record data
    int iNext;				// next record if > 0
    void *pData;				// pointer to this record's data
 } SCRIPT_REC;
@@ -83,29 +87,32 @@ struct DataSpace
 
 class SCRIPT 
 {
+private:
 	SCRIPT_REC Rec[SCRIPT_MAX_REC];
 	int RecCount;			// the total number of records parsed
-	int	RecIndex;			// the current record index being parsed
+	int	RecIndex;			// the current record index being parsed/run
+	int RecCalls;			// the running call count (0=none)
+	int RecReturn[SCRIPT_MAX_CALLS];	// the running call/return record FiFo
 	FILE *fp;				// script file handle pointer
 	char linebuf[4096];		// line buffer for parsing tokens
 	int linenum;			// line number
+	int lasterr;			// last scan error
 	char *tp;				// pointer to current token in line buffer
 	char *pData;			// pointer to current Data space destination
 
 	bool IsDataSpace(int cnt) { return (Data->Size - (Data->Ptr - Data->Space) - cnt) >= 0; }
-	int FileLineNum(void)	{ return linenum; }
+	int FileLineNum(void) { return linenum; }
 	int FileOpen(char *filename) {	return ((fp = fopen(filename, "r")) == NULL) ? 0 : 1; }
 	void FileClose() { fclose(fp); }
 	char *FileGetLine();
-
 	int ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt );
 	void ReadError(char *s);
 	void Display(char *s);
-
-	bool NextChar(int *cnt, char **pp);
-	bool NextInt(int *cnt, char **pp);
-	bool NextVar(int *cnt, char **pp);
-	bool NextBuf(int *cnt, char **pp);
+	bool AllocData(int *cnt, int size);
+	bool ScanChar(int *cnt, char **pp);
+	bool ScanInt(int *cnt, char **pp);
+	bool ScanVar(int *cnt, char **pp);
+	bool ScanStr(int *cnt, char **pp);
 
 public:
 	bool dflag;				// flag to call Dump() after parsing results
@@ -131,6 +138,8 @@ public:
 	int GetRecIndex(void) { return RecIndex; }
 	int	GetRecCount(void) { return RecCount; }
 	SCRIPT_REC *GetVarRecPtr(int iNum);
+	bool PushReturn(void);
+	bool PopReturn(void);
 };
 
 #endif //#ifndef _SCRIPT_HPP 

@@ -24,7 +24,7 @@
 #include "LOG.H"		// Capture putchar & printf output to a log file
 
 #undef TRACE
-#define TRACE
+#define TRACE(...)
 
 #ifdef _DEBUG
 #define DBG_NEW new ( _NORMAL_BLOCK , __FILE__ , __LINE__ )
@@ -53,32 +53,10 @@ SCRIPT_GRAMMER sg[]=
 	"var",		// SCRIPT_VAR
 	"goto",		// SCRIPT_GOTO
 	"test",		// SCRIPT_TEST
-	"buf"		// SCRIPT_BUF
+	"buf",		// SCRIPT_BUF
+	"call",		// SCRIPT_CALL
+	"ret"		// SCRIPT_RET
 };
-
-/*
-
-var 0; 1, 2,3,4
-txvar 0
-txvar 0;0
-txvar 0;1,2,4
-var   0;0,1
-txvar 0;1,0
-var 2
-label 1
-test 1;0;2;1
-exit 3
-test 2;0;2;1
-exit 2
-exit 1
-test 1;0;1
-exit 0
-test 0;0;0
-label 2
-goto 1;0;0
-exit 4
-
-*/
 
 char *toksep = " :,\t\n";
 char *tokval = " ,\t\n";
@@ -131,7 +109,7 @@ SCRIPT::SCRIPT(bool dump)
 
 SCRIPT::~SCRIPT(void)
 {
-	//TRACE("~SCRIPT() called\n");
+	TRACE("~SCRIPT() called\n");
 	if (Data)
 	{
 		delete Data;
@@ -171,6 +149,7 @@ int SCRIPT::Loadbin(char *szFilename)
 	bf.ReadfromFile(Data->Size, (BYTE *)Data->Space);
 	bf.CloseFile();
 	RecIndex = 0;
+	RecCalls = 0;
 	return 0;
 }
 
@@ -198,6 +177,7 @@ int SCRIPT::Savebin(char *szFilename)
 	bf.WritetoFile(Data->Size, (BYTE *)Data->Space);
 	bf.CloseFile();
 	RecIndex = 0;
+	RecCalls = 0;
 	if (Data)
 	{
 		delete Data;
@@ -205,12 +185,34 @@ int SCRIPT::Savebin(char *szFilename)
 	return 0;
 }
 
+bool SCRIPT::PushReturn(void)
+{
+	TRACE(" Push RecCalls=%d RecIndex=%d ", RecCalls, RecIndex);
+	if (RecCalls >= SCRIPT_MAX_CALLS)
+	{
+		TRACE("Overflow! ");
+		return false;
+	}
+	RecReturn[RecCalls++] = RecIndex;
+	return true;
+}
+
+bool SCRIPT::PopReturn(void)
+{
+	TRACE(" Pop RecCalls=%d RecIndex=%d ", RecCalls, RecIndex);
+	if (RecCalls <= 0)
+	{
+		TRACE("Underflow! ");
+		return false;
+	}
+	RecIndex = RecReturn[--RecCalls];
+	TRACE("=> %d ", RecIndex);
+	return true;
+}
+
 SCRIPT_REC *SCRIPT::GetRec(int iNum)
 {
-	if (iNum < RecCount)
-		return &Rec[iNum];
-	else
-		return NULL;
+	return (iNum < RecCount)? &Rec[iNum] : NULL;
 }
 
 void SCRIPT::SetRecord(int iNum)
@@ -225,56 +227,44 @@ int SCRIPT::GetRecord(void)
 
 int SCRIPT::GetVar(int iNum, int *val, int i)
 {
-	if (RecCount != 0)
+	// RecIndex range:  0----(RecCount-1)
+	if (RecCount != 0 && iNum < RecCount)
 	{
-		// RecIndex range:  0----(RecCount-1)
-		if (iNum < RecCount)
-		{
-			*val = ((SCRIPT_RECDATA *)Rec[iNum].pData)->iArray[i];
-			return TRUE;
-		}
+		*val = ((SCRIPT_RECDATA *)Rec[iNum].pData)->iArray[i];
+		return TRUE;
 	}
 	return FALSE;
 }
 
 int SCRIPT::GetVar(int iNum, byte *val, int i)
 {
-	if (RecCount != 0)
+	// RecIndex range:  0----(RecCount-1)
+	if (RecCount != 0 && iNum < RecCount)
 	{
-		// RecIndex range:  0----(RecCount-1)
-		if (iNum < RecCount)
-		{
-			*val = ((SCRIPT_RECDATA *)Rec[iNum].pData)->bArray[i];
-			return TRUE;
-		}
+		*val = ((SCRIPT_RECDATA *)Rec[iNum].pData)->bArray[i];
+		return TRUE;
 	}
 	return FALSE;
 }
 
 int SCRIPT::SetVar(int iNum, int val, int i)
 {
-	if (RecCount != 0)
+	// RecIndex range:  0----(RecCount-1)
+	if (RecCount != 0 && iNum < RecCount)
 	{
-		// RecIndex range:  0----(RecCount-1)
-		if (iNum < RecCount)
-		{
-			((SCRIPT_RECDATA *)Rec[iNum].pData)->iArray[i] = val;
-			return TRUE;
-		}
+		((SCRIPT_RECDATA *)Rec[iNum].pData)->iArray[i] = val;
+		return TRUE;
 	}
 	return FALSE;
 }
 
 int SCRIPT::SetVar(int iNum, byte val, int i)
 {
-	if (RecCount != 0)
+	// RecIndex range:  0----(RecCount-1)
+	if (RecCount != 0 && iNum < RecCount)
 	{
-		// RecIndex range:  0----(RecCount-1)
-		if (iNum < RecCount)
-		{
-			((SCRIPT_RECDATA *)Rec[iNum].pData)->bArray[i] = val;
-			return TRUE;
-		}
+		((SCRIPT_RECDATA *)Rec[iNum].pData)->bArray[i] = val;
+		return TRUE;
 	}
 	return FALSE;
 }
@@ -287,6 +277,8 @@ int  SCRIPT::GetNextRec(SCRIPT_REC *pRec)
 		if ( RecIndex < RecCount )
 		{
 			pRec->iType = Rec[RecIndex].iType;
+			pRec->bFmt[0] = Rec[RecIndex].bFmt[0];
+			pRec->bFmt[1] = Rec[RecIndex].bFmt[1];
 			pRec->iNum  = Rec[RecIndex].iNum;
 			pRec->iLen  = Rec[RecIndex].iLen;
 			pRec->pData = Rec[RecIndex].pData;
@@ -306,13 +298,10 @@ int  SCRIPT::FindTypeRecord(int type, int next)
 	for (int i = 0; i < RecCount; i++)
 	{
 		pRec = &Rec[i];
-		if (pRec->iType == type)
+		if (pRec->iType == type && pRec->iNext == next)
 		{
-			if (pRec->iNext == next)
-			{
-				// Record found.
-				return i;
-			}
+			// Record found.
+			return i;
 		}
 	}
 	return -1;
@@ -321,39 +310,39 @@ int  SCRIPT::FindTypeRecord(int type, int next)
 // Read a line of text (ie. a record) from the file
 char *SCRIPT::FileGetLine()
 {
-   int i = 0;
-   char *t;
+	int i = 0;
+	char *t;
 
-   linebuf[0] = '\0';
+	linebuf[0] = '\0';
 
 concat:
-   if ((t = fgets(&linebuf[i],sizeof(linebuf),fp)) != NULL)
-   {
-      int k = strlen(t);
-      while (k > 0 && (*(t+k-1) == '\n' || *(t+k-1) == '\r'))
-      {
-         k--;
-         *(t+k) = '\0'; // remove carriage-returns and newlines from EOL!
-      }
-      linenum++;
-      if (k == 0)
-      {
-         goto concat;
-      }
-		if (*(t+k-1) == '\\')
+	if ((t = fgets(&linebuf[i], sizeof(linebuf), fp)) != NULL)
+	{
+		int k = strlen(t);
+		while (k > 0 && (*(t + k - 1) == '\n' || *(t + k - 1) == '\r'))
 		{
-         i += k-1;
-         goto concat;
-      }
-   }
-   else
-   {
-      if (i == 0)
-      {
-         return NULL;
-      }
-   }
-   return linebuf;
+			k--;
+			*(t + k) = '\0'; // remove carriage-returns and newlines from EOL!
+		}
+		linenum++;
+		if (k == 0)
+		{
+			goto concat;
+		}
+		if (*(t + k - 1) == '\\')
+		{
+			i += k - 1;
+			goto concat;
+		}
+	}
+	else
+	{
+		if (i == 0)
+		{
+			return NULL;
+		}
+	}
+	return linebuf;
 }
 
 #define MAX_ERRSTR_LEN		256
@@ -370,38 +359,36 @@ void SCRIPT::ReadError(char *s)
 	Display(szErrStr);		
 }
 
-bool SCRIPT::NextChar(int *cnt, char **pp)
+bool SCRIPT::AllocData(int *cnt, int size)
 {
-	*cnt += sizeof(char);
-	if (!IsDataSpace(*cnt))
+	if (IsDataSpace(*cnt + size))
 	{
-		return false;
+		*cnt += size;
+		return 0;
 	}
+	lasterr = -9;	/* ERR: Out of Data space!*/
+	return 1;
+}
+bool SCRIPT::ScanChar(int *cnt, char **pp)
+{
+	if (AllocData(cnt,sizeof(char))) return false;
 	sscanf(tp, "%c", *pp);
 	*pp += sizeof(char);
 	return true;
 }
 
-bool SCRIPT::NextInt(int *cnt, char **pp)
+bool SCRIPT::ScanInt(int *cnt, char **pp)
 {
-	*cnt += sizeof(int);
-	if (!IsDataSpace(*cnt))
-	{
-		return false;
-	}
+	if (AllocData(cnt,sizeof(int))) return false;
 	sscanf(tp, "%d", *pp);
 	*pp += sizeof(int);
 	return true;
 }
 
-bool SCRIPT::NextVar(int *cnt, char **pp)
+bool SCRIPT::ScanVar(int *cnt, char **pp)
 {
 	int i;
-	*cnt += sizeof(int);
-	if (!IsDataSpace(*cnt))
-	{
-		return false;
-	}
+	if (AllocData(cnt, sizeof(int))) return false;
 	/* Get next token. */
 	sscanf(tp, "%d", &i);
 	/* Look ahead, if a '@' character appears then expect a var number followed by an index number. */
@@ -423,15 +410,14 @@ bool SCRIPT::NextVar(int *cnt, char **pp)
 	return true;
 }
 
-bool SCRIPT::NextBuf(int *cnt, char **pp)
+bool SCRIPT::ScanStr(int *cnt, char **pp)
 {
 	char *pSrc = tp;
 	while (*pSrc)
 	{
 		if (*pSrc != '\\')
 		{
-			*cnt += 1;
-			if (!IsDataSpace(*cnt)) return false;
+			if (AllocData(cnt, sizeof(char))) return false;
 			*(*pp)++ = *pSrc++;
 		}
 		else
@@ -439,11 +425,9 @@ bool SCRIPT::NextBuf(int *cnt, char **pp)
 			pSrc++;
 			if (*pSrc != 'x' && *pSrc != 'X')
 			{
-				*cnt += 1;
-				if (!IsDataSpace(*cnt)) return false;
+				if (AllocData(cnt, sizeof(char))) return false;
 				*(*pp)++ = '\\';
-				*cnt += 1;
-				if (!IsDataSpace(*cnt)) return false;
+				if (AllocData(cnt, sizeof(char))) return false;
 				*(*pp)++ = *pSrc++;
 			}
 			else
@@ -454,21 +438,17 @@ bool SCRIPT::NextBuf(int *cnt, char **pp)
 				szByte[0] = *pSrc++;	// high nibble
 				szByte[1] = *pSrc++;    // low nibble
 				szByte[2] = '\0';
-
 				if (isxdigit(szByte[0]) && isxdigit(szByte[1]))
 				{
-					*cnt += 1;
-					if (!IsDataSpace(*cnt)) return false;
+					if (AllocData(cnt, sizeof(char))) return false;
 					sscanf(szByte, "%02X", *pp);
 					*(*pp)++;
 				}
 				else
 				{
-					*cnt += 1;
-					if (!IsDataSpace(*cnt)) return false;
+					if (AllocData(cnt, sizeof(char))) return false;
 					*(*pp)++ = szByte[0];
-					*cnt += 1;
-					if (!IsDataSpace(*cnt)) return false;
+					if (AllocData(cnt, sizeof(char))) return false;
 					*(*pp)++ = szByte[1];
 				}
 			}
@@ -483,21 +463,22 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
     char *line;
     SCRIPT_REC *ip=rec;
 	char szInfo[512];
-	int rc = 0;
 	char *pDest = NULL;
 
+	lasterr = 0;
 	linenum = 0;
 	
 	if ( !FileOpen(filename) )
     {
         sprintf(szInfo, "File %s not found!", filename);
 		Display( szInfo );
-        return -1;
+        return lasterr = -1;
     }
     TRACE("Reading records from File %s\n", filename);
 
 	RecCount = 0;		// when reading failed, RecCount=0
 	RecIndex = 0;
+	RecCalls = 0;
 
 	while ((line = FileGetLine()) != NULL)
     {
@@ -512,8 +493,10 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 			//if (*tp==0x1A)
             //    goto eof;
 
-			if (*(tp+0)=='/' && *(tp+1)=='/' )
-                continue;	// skip over comments
+			if (*(tp + 0) == '/' && *(tp + 1) == '/')
+			{
+				continue;	// skip over comments
+			}
 
 			if (pDest == NULL)
 			{
@@ -536,91 +519,39 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 						}
 					}
 					sprintf(szInfo, "Invalid Data directive");
-					rc = -6;
+					lasterr = -6;
 					goto err;
 				}
 				else
 				{
 					sprintf(szInfo, "Expecting Record Type data");
-					rc = -8;
+					lasterr = -8;
 					goto err;
 				}
 			}
-			else if (!strcmp(tp, sg[SCRIPT_TXCHAR].szKey))
-			{
-				tp=strtok(NULL,toksep);
-				char *pSrc = tp;
-				while (*pSrc)
-				{
-					if (*pSrc != '\\')
-					{
-						cnt += 1;
-						if (!IsDataSpace(cnt)) goto errmem;
-						*pDest++ = *pSrc++;
-					}
-					else
-					{
-						pSrc++;
-						if (*pSrc!='x' && *pSrc!='X')
-						{
-							sprintf(szInfo, "Wrong Escape string %s", tp );
-							rc = -2;
-							goto err;
-						}
-						else
-						{							
-							pSrc++;
 
-							char szByte[3];
-							szByte[0] = *pSrc++;	// high nibble
-							szByte[1] = *pSrc++;	// low nibble
-							szByte[2] = 0;
+			Rec[RecIndex].bFmt[0] = 0;
+			Rec[RecIndex].bFmt[1] = 0;
+			Rec[RecIndex].iNext = 0;
 
-							if (!isxdigit(szByte[0]) || !isxdigit(szByte[1]))
-							{
-								sprintf(szInfo, "Wrong Escape string %s", tp);
-								rc = -3;
-								goto err;
-							}
-							cnt += 1;
-							if (!IsDataSpace(cnt)) goto errmem;
-							sscanf(szByte, "%02X", pDest);
-							pDest++;
-						}
-					}
-				}				
-				*pDest=0;
-				Rec[RecIndex].iType = SCRIPT_TXCHAR;
-				Rec[RecIndex].iNext = 0;
-			}
-			else if (!strcmp(tp, sg[SCRIPT_TXFILE].szKey))
-			{
-				tp = strtok(NULL,tokeol);
-				cnt += strlen(tp) + 1;
-				if (!IsDataSpace(cnt)) goto errmem;
-				strcpy(Data->Ptr, tp);
-				Rec[RecIndex].iType = SCRIPT_TXFILE;
-				Rec[RecIndex].iNext = 0;
-			}
-			else if (!strcmp(tp, sg[SCRIPT_TXBUF].szKey))
-			{
-				int n = 0;
-				while ((tp = strtok(NULL, toksep)) != NULL)
-				{
-					if (!NextInt(&cnt, &pDest)) goto errmem;	 // MaxCnt
-					if ((tp = strtok(NULL, toksep)) != NULL)
-					{
-						if (!NextVar(&cnt, &pDest)) goto errmem; // X;x
-					}
-					n++;
-				}
-				Rec[RecIndex].iType = SCRIPT_TXBUF;
-				Rec[RecIndex].iNext = n;						 // number of bufs
-			}
-			else if (!strcmp(tp, sg[SCRIPT_RXCHAR].szKey))
+			if (!strcmp(tp, sg[SCRIPT_CALL].szKey))
 			{
 				int label = -1;
-				if ((tp = strtok(NULL, tokeol)) != NULL)
+				if ((tp = strtok(NULL, toksep)) != NULL)
+				{
+					sscanf(tp, "%d", &label);
+				}
+				Rec[RecIndex].iType = SCRIPT_CALL;
+				Rec[RecIndex].iNext = label;					// Label to call
+			}
+			else if (!strcmp(tp, sg[SCRIPT_RET].szKey))
+			{
+				Rec[RecIndex].iType = SCRIPT_RET;
+			}
+			else if (!strcmp(tp, sg[SCRIPT_TXCHAR].szKey))
+			{
+				int label = -1;
+				if ((tp = strtok(NULL, toksep)) != NULL)
 				{
 					char *pSrc = tp;
 					while (*pSrc)
@@ -636,8 +567,79 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 							pSrc++;
 							if (*pSrc != 'x' && *pSrc != 'X')
 							{
-								sprintf(szInfo, "Wrong Escape string %s", tp);
-								rc = -4;
+								sprintf(szInfo, "Wrong Esc character %s", tp);
+								lasterr = -2;
+								goto err;
+							}
+							else
+							{
+								pSrc++;
+
+								char szByte[3];
+								szByte[0] = *pSrc++;	// high nibble
+								szByte[1] = *pSrc++;	// low nibble
+								szByte[2] = 0;
+
+								if (!isxdigit(szByte[0]) || !isxdigit(szByte[1]))
+								{
+									sprintf(szInfo, "Invalid hex digit %s", tp);
+									lasterr = -3;
+									goto err;
+								}
+								if (AllocData(&cnt, sizeof(char))) goto errmem;
+								sscanf(szByte, "%02X", pDest);
+								pDest++;
+							}
+						}
+					}
+					*pDest = 0;
+				}
+				Rec[RecIndex].iType = SCRIPT_TXCHAR;
+				Rec[RecIndex].iNext = label;					// Label to jump to on errors
+			}
+			else if (!strcmp(tp, sg[SCRIPT_TXFILE].szKey))
+			{
+				if ((tp = strtok(NULL, tokeol)) != NULL)
+				{
+					if (!ScanStr(&cnt, &pDest)) goto errmem;	// Filename
+					Rec[RecIndex].iType = SCRIPT_TXFILE;
+				}
+			}
+			else if (!strcmp(tp, sg[SCRIPT_TXBUF].szKey))
+			{
+				int n = 0;
+				while ((tp = strtok(NULL, toksep)) != NULL)
+				{
+					if (!ScanInt(&cnt, &pDest)) goto errmem;	// MaxCnt
+					if ((tp = strtok(NULL, toksep)) != NULL)
+					{
+						if (!ScanVar(&cnt, &pDest)) goto errmem;// X;x
+					}
+					n++;
+				}
+				Rec[RecIndex].iType = SCRIPT_TXBUF;
+				Rec[RecIndex].iNext = n;						// Number of bufs
+			}
+			else if (!strcmp(tp, sg[SCRIPT_RXCHAR].szKey))
+			{
+				int label = -1;
+				if ((tp = strtok(NULL, tokeol)) != NULL)
+				{
+					char *pSrc = tp;
+					while (*pSrc)
+					{
+						if (*pSrc != '\\')
+						{
+							if (AllocData(&cnt, sizeof(char))) goto errmem;
+							*pDest++ = *pSrc++;
+						}
+						else
+						{
+							pSrc++;
+							if (*pSrc != 'x' && *pSrc != 'X')
+							{
+								sprintf(szInfo, "Wrong Esc character %s", tp);
+								lasterr = -4;
 								goto err;
 							}
 							else
@@ -651,12 +653,11 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 
 								if (!isxdigit(szByte[0]) || !isxdigit(szByte[1]))
 								{
-									sprintf(szInfo, "Wrong Escape string %s", tp);
-									rc = -5;
+									sprintf(szInfo, "Invalid hex digit %s", tp);
+									lasterr = -5;
 									goto err;
 								}
-								cnt += 1;
-								if (!IsDataSpace(cnt)) goto errmem;
+								if (AllocData(&cnt, sizeof(char))) goto errmem;
 								sscanf(szByte, "%02X", pDest);
 								pDest++;
 							}
@@ -669,64 +670,62 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 					}
 				}
 				Rec[RecIndex].iType = SCRIPT_RXCHAR;
-				Rec[RecIndex].iNext = label;
+				Rec[RecIndex].iNext = label;					// Label to jump to on errors
 			}
 			else if (!strcmp(tp, sg[SCRIPT_SKIP].szKey))
 			{
-				int label = -1;
+				int offset = 0;
 				if ((tp = strtok(NULL, toksep)) != NULL)
 				{
-					if (!NextInt(&cnt, &pDest)) goto errmem;
+					if (!ScanInt(&cnt, &pDest)) goto errmem;
 					if ((tp = strtok(NULL, toksep)) != NULL)
 					{
-						if (!NextVar(&cnt, &pDest)) goto errmem;
+						if (!ScanVar(&cnt, &pDest)) goto errmem;
 						if ((tp = strtok(NULL, toksep)) != NULL)
 						{
-							sscanf(tp, "%d", &label);
+							sscanf(tp, "%d", &offset);
 						}
 					}
 				}
 				Rec[RecIndex].iType = SCRIPT_SKIP;
-				Rec[RecIndex].iNext = label;
+				Rec[RecIndex].iNext = offset;					// Offset to skip over on errors (ie. +/- records) 
 			}
 			else if (!strcmp(tp, sg[SCRIPT_DELAY].szKey))
 			{
 				if ((tp = strtok(NULL, toksep)) != NULL)
 				{
-					if (!NextInt(&cnt, &pDest)) goto errmem;
+					if (!ScanInt(&cnt, &pDest)) goto errmem;
 				}
 				Rec[RecIndex].iType = SCRIPT_DELAY;
-				Rec[RecIndex].iNext = 0;
 			}
 			else if (!strcmp(tp, sg[SCRIPT_TIMEOUT].szKey))
 			{
 				if ((tp = strtok(NULL, toksep)) != NULL)
 				{
-					if (!NextInt(&cnt, &pDest)) goto errmem;
+					if (!ScanInt(&cnt, &pDest)) goto errmem;
 				}
 				Rec[RecIndex].iType = SCRIPT_TIMEOUT;
-				Rec[RecIndex].iNext = 0;
 			}
 			else if (!strcmp(tp, sg[SCRIPT_EXIT].szKey))
 			{
 				if ((tp = strtok(NULL, toksep)) != NULL)
 				{
-					if (!NextInt(&cnt, &pDest)) goto errmem;
+					if (!ScanInt(&cnt, &pDest)) goto errmem;
 				}
 				Rec[RecIndex].iType = SCRIPT_EXIT;
-				Rec[RecIndex].iNext = 0;
 			}
 			else  if (!strcmp(tp, sg[SCRIPT_VAR].szKey))
 			{
 				int var = 0;
-				while ((tp = strtok(NULL, toksep)) != NULL)
+				if ((tp = strtok(NULL, toksep)) != NULL)
 				{
 					sscanf(tp, "%d", &var);
-					if ((tp = strtok(NULL, tokval)) != NULL)
+					while ((tp = strtok(NULL, tokval)) != NULL)
 					{
-						if (!NextInt(&cnt, &pDest)) goto errmem;
+						if (!ScanInt(&cnt, &pDest)) goto errmem;
 					}
 				}
+				Rec[RecIndex].bFmt[0] = 0;
 				Rec[RecIndex].iType = SCRIPT_VAR;
 				Rec[RecIndex].iNext = var;
 			}
@@ -736,13 +735,13 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 				if ((tp = strtok(NULL, toksep)) != NULL)
 				{
 					sscanf(tp, "%d", &label);
-				}
-				if ((tp = strtok(NULL, tokval)) != NULL)
-				{
-					if (!NextVar(&cnt, &pDest)) goto errmem;
-					while ((tp = strtok(NULL, tokval)) != NULL)
+					if ((tp = strtok(NULL, tokval)) != NULL)
 					{
-						if (!NextInt(&cnt, &pDest)) goto errmem;
+						if (!ScanVar(&cnt, &pDest)) goto errmem;
+						while ((tp = strtok(NULL, tokval)) != NULL)
+						{
+							if (!ScanInt(&cnt, &pDest)) goto errmem;
+						}
 					}
 				}
 				Rec[RecIndex].iType = SCRIPT_GOTO;
@@ -757,10 +756,10 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 				}
 				if ((tp = strtok(NULL, tokval)) != NULL)
 				{
-					if (!NextVar(&cnt, &pDest)) goto errmem;
+					if (!ScanVar(&cnt, &pDest)) goto errmem;
 					while ((tp = strtok(NULL, tokval)) != NULL)
 					{
-						if (!NextInt(&cnt, &pDest)) goto errmem;
+						if (!ScanInt(&cnt, &pDest)) goto errmem;
 					}
 				}
 				Rec[RecIndex].iType = SCRIPT_TEST;
@@ -787,10 +786,9 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 							p++;
 							tp = p;
 							int k = 0;
-							if (!NextBuf(&k, &pDest)) goto errmem;
+							if (!ScanStr(&k, &pDest)) goto errmem;
 							TRACE("cnt=%d j=%d k=%d\n", cnt, j, k);
-							cnt += max(j, k);
-							if (!IsDataSpace(cnt)) goto errmem;
+							if (AllocData(&cnt, max(j, k))) goto errmem;
 							if (j > k)
 							{
 								for (; k < j; k++)
@@ -800,10 +798,11 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 							}
 							continue;
 						}
-						if (!NextBuf(&cnt, &pDest)) goto errmem;
+						if (!ScanStr(&cnt, &pDest)) goto errmem;
 					}
 				}
-				Rec[RecIndex].iType = SCRIPT_BUF;
+				Rec[RecIndex].bFmt[0] = 1;
+				Rec[RecIndex].iType = SCRIPT_VAR;
 				Rec[RecIndex].iNext = buf;
 			}
 			else  if (isdigit(*tp))
@@ -817,7 +816,7 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 			else
 			{
 				sprintf(szInfo, "Incorrect Record Type %s", tp);
-				rc = -8;
+				lasterr = -8;
 				goto err;
 			}
         }
@@ -828,24 +827,25 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 
 		if (++RecIndex >= MaxRecCnt)
         {
-			ReadError("Too many records!");
-			rc = -7;
+			sprintf(szInfo, "Too many records!");
+			lasterr = -7;
 			goto err;
         }
     }
 	RecCount = RecIndex;
 	TRACE("%d records, bytes %d used / %d remaining\n", RecCount, Data->Ptr - Data->Space, Data->Size - (Data->Ptr - Data->Space));
+	lasterr = 0;
 	FileClose();
-	return rc;
+	return 0;
 
 errmem:
 	sprintf(szInfo, "Out of Data space!");
-	rc = -9;
 	// fall through...
 err:
 	ReadError(szInfo);
+	// fall through...
 	FileClose();
-	return rc;
+	return lasterr;
 
 }
 

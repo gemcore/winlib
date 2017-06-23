@@ -8,7 +8,7 @@
 #include "src\comport.h"
 
 #undef TRACE
-#define TRACE
+#define TRACE(...)
 
 #define RUN_TESTING
 //#define COM_TESTING
@@ -77,8 +77,10 @@ int send_char(byte c)
 #define TXSCRIPT_VAR_NOT_FOUND   -6
 #define TXSCRIPT_BUF_NOT_FOUND   -7
 #define TXSCRIPT_VAL_UNDEFINED   -8
-#define TXSCRIPT_ABORTED         -9
-#define TXSCRIPT_OTHER          -10
+#define TXSCRIPT_RET_UNDEFINED   -9
+#define TXSCRIPT_CALL_OVERFLOW  -10
+#define TXSCRIPT_ABORTED        -11
+#define TXSCRIPT_OTHER          -12
 
 class TxScript : public ActiveObject
 {
@@ -145,11 +147,60 @@ void TxScript::Run()
 		printf("> %03d: ", rec.iNum);
 		switch (rec.iType)
 		{
+		case SCRIPT_CALL:
+		{
+			int c;
+			pRecData = (SCRIPT_RECDATA*)(rec.pData);
+			printf("call %d ", rec.iNext);
+			int i;
+			// call label record specified 
+			i = pScript->FindTypeRecord(SCRIPT_LABEL, rec.iNext);
+			if (i >= 0)
+			{
+				/* Push our current record location in a fifo so we can 'ret' later. */
+				if (!pScript->PushReturn())
+				{
+					printf("\n%s: Call_Overflow!\n", getname());
+					Result = TXSCRIPT_CALL_OVERFLOW;
+					bSuccess = false;
+					break;
+				}
+				TRACE("\njump to record %d", i);
+				pScript->SetRecord(i);
+			}
+			else
+			{
+				TRACE("\n%s: [%d] Label_Not_Found!\n", getname(), rec.iNext);
+				Result = TXSCRIPT_LABEL_NOT_FOUND;
+				break;
+			}
+			putchar('\n');
+		}
+		break;
+
+		case SCRIPT_RET:
+		{
+			int i;
+			pRecData = (SCRIPT_RECDATA*)(rec.pData);
+			printf("ret ");
+			/* Pop the return record location. */
+			if (!pScript->PopReturn())
+			{
+				printf("\n%s: Ret_Undefined!\n", getname());
+				Result = TXSCRIPT_RET_UNDEFINED;
+				bSuccess = false;					 
+				break;
+			}
+			TRACE("\njump to record %d", pScript->GetRecord());
+			putchar('\n');
+		}
+		break;
+
 		case SCRIPT_TXCHAR:
 		{
 			int c;
 			pRecData = (SCRIPT_RECDATA*)(rec.pData);
-			printf("tx %d ", rec.iLen, pRecData->cArray);
+			printf("tx %d ", rec.iLen);
 			for (int i = 0; i < rec.iLen; i++)
 			{
 				c = pRecData->cArray[i] & 0xFF;
@@ -188,7 +239,7 @@ void TxScript::Run()
 				}
 				if (buf != -1)
 				{
-					j = pScript->FindTypeRecord(SCRIPT_BUF, buf);
+					j = pScript->FindTypeRecord(SCRIPT_VAR, buf);
 					if (j >= 0)
 					{
 						putchar(',');
@@ -212,8 +263,16 @@ void TxScript::Run()
 				for (Cnt = 0; Cnt < MaxCnt; Cnt++)
 				{
 					int c;
-					// Get char from byte array.
-					pScript->GetVar(j, (byte *)&c, idx + Cnt);
+					if (pScript->GetRec(j)->bFmt[0] == 0)
+					{
+						// Get int from int array.
+						pScript->GetVar(j, (int *)&c, idx + Cnt);
+					}
+					else
+					{
+						// Get char from byte array.
+						pScript->GetVar(j, (byte *)&c, idx + Cnt);
+					}
 					c &= 0xFF;
 					if (isprint(c))
 					{
@@ -438,7 +497,7 @@ void TxScript::Run()
 					bFound = true;
 					break;
 				}
-				while ((c = recv_char()) != -1)
+				while (!bFound && (c = recv_char()) != -1)
 				{
 					if (isprint(c))
 						putchar(c);
@@ -446,8 +505,15 @@ void TxScript::Run()
 						printf("\\x%02X", c);
 					if (var != -1)
 					{
-						// Save char to variable array.
-						pScript->SetVar(j, c, idx + Cnt);
+						// Save char to var or buf array.
+						if (pScript->GetRec(j)->bFmt[0] == 0)
+						{
+							pScript->SetVar(j, c, idx + Cnt);
+						}
+						else
+						{
+							pScript->SetVar(j, (byte)c, idx + Cnt);
+						}
 					}
 					Cnt++;
 					if (Cnt >= MaxCnt)
@@ -514,13 +580,48 @@ void TxScript::Run()
 		case SCRIPT_VAR:
 		{
 			pRecData = (SCRIPT_RECDATA*)(rec.pData);
-			printf("var %d:", rec.iNext);
+			if (rec.bFmt[0] == 0)
+			{
+				printf("var %d:", rec.iNext);
+				int i;
+				int n = rec.iLen / sizeof(int);
+				for (i = 0; i < n; i++)
+				{
+					printf("%d", pRecData->iArray[i]);
+					putchar(((i + 1) < n) ? ',' : ' ');
+				}
+			}
+			else
+			{
+				printf("buf %d:", rec.iNext);
+				int i;
+				int n = rec.iLen / sizeof(char);
+				for (i = 0; i < n; i++)
+				{
+					int c = pRecData->bArray[i];
+					if (isprint(c))
+						putchar(c);
+					else
+						printf("\\x%02X", c);
+				}
+			}
+			putchar('\n');
+		}
+		break;
+
+		case SCRIPT_BUF:
+		{
+			pRecData = (SCRIPT_RECDATA*)(rec.pData);
+			printf("buf %d:", rec.iNext);
 			int i;
-			int n = rec.iLen / sizeof(int);
+			int n = rec.iLen / sizeof(byte);
 			for (i = 0; i < n; i++)
 			{
-				printf("%d", pRecData->iArray[i]);
-				putchar(((i + 1) < n) ? ',' : ' ');
+				int c = pRecData->bArray[i] & 0xFF;
+				if (isprint(c))
+					putchar(c);
+				else
+					printf("\\x%02X", c);
 			}
 			putchar('\n');
 		}
@@ -570,18 +671,38 @@ void TxScript::Run()
 							}
 						}
 						TRACE(" %d@%d=", var, idx);
-						pScript->GetVar(j, &var, idx);
-						TRACE("(%d", var);
-						if (var >= val)
+						if (pScript->GetRec(j)->bFmt[0] == 0)
 						{
-							TRACE(">=%d) continue", val);
+							pScript->GetVar(j, &var, idx);
+							TRACE("(%d", var);
+							if (var >= val)
+							{
+								TRACE(">=%d) continue", val);
+							}
+							else
+							{
+								TRACE("< %d) inc=%d, new val=%d", val, inc, var + inc);
+								pScript->SetVar(j, var + inc, idx);
+								TRACE("\njump to record %d", i);
+								pScript->SetRecord(i);		// Goto to record
+							}
 						}
 						else
 						{
-							TRACE("< %d) inc=%d, new val=%d", val, inc, var + inc);
-							pScript->SetVar(j, var + inc, idx);
-							TRACE("\njump to record %d", i);
-							pScript->SetRecord(i);		// Goto to record
+							pScript->GetVar(j, (byte *)&var, idx);
+							var &= 0xFF;
+							TRACE("(%d", var);
+							if (var >= val)
+							{
+								TRACE(">=%d) continue", val);
+							}
+							else
+							{
+								TRACE("< %d) inc=%d, new val=%d", val, inc, var + inc);
+								pScript->SetVar(j, (byte)(var + inc), idx);
+								TRACE("\njump to record %d", i);
+								pScript->SetRecord(i);		// Goto to record
+							}
 						}
 					}
 					else
@@ -649,22 +770,46 @@ void TxScript::Run()
 						}
 					}
 					TRACE(" %d@%d=", var, idx);
-					pScript->GetVar(j, &var, idx);
-					TRACE("(%d", var);
-					if (var == val)
+					if (pScript->GetRec(j)->bFmt[0] == 0)
 					{
-						TRACE("==%d) continue", val);
+						pScript->GetVar(j, &var, idx);
+						TRACE("(%d", var);
+						if (var == val)
+						{
+							TRACE("==%d) continue", val);
+						}
+						else
+						{
+							TRACE("!=%d), ", val);
+							if (rec.iLen >= 12)
+							{
+								TRACE("new val=%d, ", inc);
+								pScript->SetVar(j, inc, idx);
+							}
+							TRACE("skip %d records", rec.iNext);
+							pScript->SetRecord(pScript->GetRecord() + rec.iNext);	// Skip over records
+						}
 					}
 					else
 					{
-						TRACE("!=%d), ", val);
-						if (rec.iLen >= 12)
+						pScript->GetVar(j, (byte *)&var, idx);
+						var &= 0xFF;
+						TRACE("(%d", var);
+						if (var == val)
 						{
-							TRACE("new val=%d, ", inc);
-							pScript->SetVar(j, inc, idx);
+							TRACE("==%d) continue", val);
 						}
-						TRACE("skip %d records", rec.iNext);
-						pScript->SetRecord(pScript->GetRecord() + rec.iNext);	// Skip over records
+						else
+						{
+							TRACE("!=%d), ", val);
+							if (rec.iLen >= 12)
+							{
+								TRACE("new val=%d, ", inc);
+								pScript->SetVar(j, (byte)inc, idx);
+							}
+							TRACE("skip %d records", rec.iNext);
+							pScript->SetRecord(pScript->GetRecord() + rec.iNext);	// Skip over records
+						}
 					}
 				}
 				else
@@ -674,24 +819,6 @@ void TxScript::Run()
 					bSuccess = false;
 					break;
 				}
-			}
-			putchar('\n');
-		}
-		break;
-
-		case SCRIPT_BUF:
-		{
-			pRecData = (SCRIPT_RECDATA*)(rec.pData);
-			printf("buf %d:", rec.iNext);
-			int i;
-			int n = rec.iLen;
-			for (i = 0; i < n; i++)
-			{
-				int c = pRecData->bArray[i] & 0xFF;
-				if (isprint(c))
-					putchar(c);
-				else
-					printf("\\x%02X", c);
 			}
 			putchar('\n');
 		}
@@ -774,24 +901,26 @@ int main()
 		printf("Result=%d\n", rc);
 		sp->Dump();
 		/* Check variable 2. */
-		SCRIPT_REC *r = sp->GetVarRecPtr(2);
+		SCRIPT_REC *r = sp->GetVarRecPtr(6);
 		if (r != NULL)
 		{
 			SCRIPT_RECDATA *d = (SCRIPT_RECDATA *)r->pData;
-			//MEM_Dump((unsigned char *)d->iArray, r->iLen, 0L);
-			printf("var 2:");
-			//for (int i = 0; i < 5; i++)
-			//{
-			//	printf("\\x%08X,", d->iArray[i]);
-			//}
-			//printf(" as char:");
-			for (int i = 0; i < 5; i++)
+			if (d->bArray[0] != 0x00)
 			{
-				printf("%c,", (char)d->iArray[i]);
+				//MEM_Dump((unsigned char *)d->iArray, r->iLen, 0L);
+				printf("var 2:");
+				//for (int i = 0; i < 5; i++)
+				//{
+				//	printf("\\x%08X,", d->iArray[i]);
+				//}
+				//printf(" as char:");
+				for (int i = 0; i < 5; i++)
+				{
+					printf("%c,", (char)d->bArray[i]);
+				}
+				printf("\nublox version: %c.%c.%c.%c%c\n",
+					(char)d->bArray[0], (char)d->bArray[1], (char)d->bArray[2], (char)d->bArray[3], (char)d->bArray[4]);
 			}
-			printf("\n");
-			printf("ublox version: %c.%c.%c.%c%c\n",
-				(char)d->iArray[0], (char)d->iArray[1], (char)d->iArray[2], (char)d->iArray[3], (char)d->iArray[4]);
 		}
 		delete sp;
 	}
