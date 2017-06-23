@@ -27,27 +27,28 @@
 
 enum SCRIPT_TYPE
 {
-	SCRIPT_DATA = 0,		// data
-	SCRIPT_TXCHAR,			// tx
-	SCRIPT_TXFILE,			// txfile
-	SCRIPT_TXVAR,			// txvar
-	SCRIPT_RXCHAR,			// rx
-	SCRIPT_SKIP,			// skip
-	SCRIPT_DELAY,			// delay
-	SCRIPT_TIMEOUT,			// timeout
-	SCRIPT_EXIT,			// exit
-	SCRIPT_LABEL,			// label
-	SCRIPT_VAR,				// var
-	SCRIPT_GOTO,			// goto
-	SCRIPT_TEST,			// test
-	SCRIPT_BUF,				// buf
-	SCRIPT_TOTAL_TYPES
+	/* Reserved words. */
+	SCRIPT_DATA = 0,		// 00 data
+	SCRIPT_TXCHAR,			// 01 tx
+	SCRIPT_TXFILE,			// 02 txfile
+	SCRIPT_TXBUF,			// 03 txbuf
+	SCRIPT_RXCHAR,			// 04 rx
+	SCRIPT_SKIP,			// 05 skip
+	SCRIPT_DELAY,			// 06 delay
+	SCRIPT_TIMEOUT,			// 07 timeout
+	SCRIPT_EXIT,			// 08 exit
+	SCRIPT_VAR,				// 09 var
+	SCRIPT_GOTO,			// 10 goto
+	SCRIPT_TEST,			// 11 test
+	SCRIPT_BUF,				// 12 buf
+
+	/* Special tokens. */
+	SCRIPT_LABEL,			// 13 label
 };
 
 typedef struct
 {
 	char *szKey;			// key word
-	SCRIPT_TYPE iType;		// type
 } SCRIPT_GRAMMER;
 
 typedef struct
@@ -101,8 +102,10 @@ class SCRIPT
 	void ReadError(char *s);
 	void Display(char *s);
 
+	bool NextChar(int *cnt, char **pp);
 	bool NextInt(int *cnt, char **pp);
 	bool NextVar(int *cnt, char **pp);
+	bool NextBuf(int *cnt, char **pp);
 
 public:
 	bool dflag;				// flag to call Dump() after parsing results
@@ -122,7 +125,9 @@ public:
 	void SetRecord(int iNum);
 	int GetRecord(void);
 	int GetVar(int iNum, int *var, int i=0);
+	int GetVar(int iNum, byte *var, int i = 0);
 	int SetVar(int iNum, int val, int i=0);
+	int SetVar(int iNum, byte val, int i = 0);
 	int GetRecIndex(void) { return RecIndex; }
 	int	GetRecCount(void) { return RecCount; }
 	SCRIPT_REC *GetVarRecPtr(int iNum);

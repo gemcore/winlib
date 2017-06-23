@@ -22,6 +22,9 @@
 //#include "tty.h"
 #include "syserr.h"
 
+//#define TRACE	printf
+#define TRACE(...)
+
 #define ASCII_XON		DC1
 #define ASCII_XOFF		DC3
 
@@ -58,7 +61,7 @@ ComPort::ComPort(int num,DWORD baud,BYTE parity,BYTE stop) :
 
 void ComPort::Run ()
 {
-   printf("ComPort%d::Run()\n",bPort);
+   TRACE("ComPort%d::Run()\n",bPort);
    for (;;)
    {
       if (_isDying)
@@ -83,7 +86,7 @@ void ComPort::Run ()
 
 void ComPort::FlushThread ()
 {
-   printf("ComPort%d::FlushThread()\n",bPort);
+   TRACE("ComPort%d::FlushThread()\n",bPort);
 
    // disable event notification and wait for thread to halt
    SetCommMask( id, 0 );
@@ -95,13 +98,13 @@ bool ComPort::Start()
 {
    Lock lock(_mutex);
 
-   printf("ComPort%d::Start()\n",bPort);
+   TRACE("ComPort%d::Start()\n",bPort);
 
    MultiByteToWideChar(CP_ACP, 0, szPort, -1, swPort, sizeof(swPort));
 
    if (fConnected)
    {
-      printf("Connection already open!\n");
+      TRACE("Connection already open!\n");
       return true;
    }
 
@@ -220,7 +223,7 @@ bool ComPort::Start()
       printf("Failed to create event for overlapped write!\n");
       return false;
    }
-   printf("Connection open\n");
+   TRACE("Connection open\n");
    fConnected = true;
    return true;
 }
@@ -229,7 +232,7 @@ bool ComPort::Stop()
 {
    Lock lock(_mutex);
 
-   printf("ComPort::Stop()\n");
+   TRACE("ComPort::Stop()\n");
 
    if (!fConnected)
       return true;
@@ -252,7 +255,7 @@ bool ComPort::Stop()
    // get rid of event handle for overlapped read
    CloseHandle( osRead.hEvent );
 
-   printf("Connection terminated\n");
+   TRACE("Connection terminated\n");
 
    // set connected flag to FALSE
    fConnected = false;
