@@ -42,6 +42,7 @@ void MEM_Dump(unsigned char *data, int len, long base);
 SCRIPT_GRAMMER sg[]=
 {
 	"data",		// SCRIPT_DATA
+	"serial",	// SCRIPT_SERIAL
 	"tx",		// SCRIPT_TXCHAR
 	"txfile",	// SCRIPT_TXFILE
 	"txbuf",	// SCRIPT_TXBUF
@@ -95,7 +96,7 @@ SCRIPT::SCRIPT(bool dump)
 {
 	dflag = dump;
 
-	TRACE("SCRIPT() called\n");
+	TRACE("SCRIPT(%d) this=%08x\n",dump,this);
 	Data = NULL;
 
 	for (int i = 0; i < SCRIPT_MAX_REC; i++)
@@ -109,7 +110,7 @@ SCRIPT::SCRIPT(bool dump)
 
 SCRIPT::~SCRIPT(void)
 {
-	TRACE("~SCRIPT() called\n");
+	TRACE("~SCRIPT() this=%08x\n",this);
 	if (Data)
 	{
 		delete Data;
@@ -197,16 +198,19 @@ bool SCRIPT::PushReturn(void)
 	return true;
 }
 
-bool SCRIPT::PopReturn(void)
+bool SCRIPT::PopReturn(int i)
 {
-	TRACE(" Pop RecCalls=%d RecIndex=%d ", RecCalls, RecIndex);
-	if (RecCalls <= 0)
+	TRACE(" Pop(%d) RecCalls=%d RecIndex=%d ", i, RecCalls, RecIndex);
+	while (i-- >= 0)
 	{
-		TRACE("Underflow! ");
-		return false;
+		if (RecCalls <= 0)
+		{
+			TRACE("Underflow! ");
+			return false;
+		}
+		RecIndex = RecReturn[--RecCalls];
+		TRACE("RecReturn[%d]=%d ", RecCalls, RecIndex);
 	}
-	RecIndex = RecReturn[--RecCalls];
-	TRACE("=> %d ", RecIndex);
 	return true;
 }
 
@@ -425,10 +429,18 @@ bool SCRIPT::ScanStr(int *cnt, char **pp)
 			pSrc++;
 			if (*pSrc != 'x' && *pSrc != 'X')
 			{
-				if (AllocData(cnt, sizeof(char))) return false;
-				*(*pp)++ = '\\';
-				if (AllocData(cnt, sizeof(char))) return false;
-				*(*pp)++ = *pSrc++;
+				if (*pSrc != '\\')
+				{
+					if (AllocData(cnt, sizeof(char))) return false;
+					*(*pp)++ = '\\';
+					if (AllocData(cnt, sizeof(char))) return false;
+					*(*pp)++ = *pSrc++;
+				}
+				else
+				{
+					if (AllocData(cnt, sizeof(char))) return false;
+					*(*pp)++ = '\\';
+				}
 			}
 			else
 			{
@@ -454,7 +466,8 @@ bool SCRIPT::ScanStr(int *cnt, char **pp)
 			}
 		}
 	}
-	*(*pp) = '\0';
+	if (AllocData(cnt, sizeof(char))) return false;
+	*(*pp)++ = '\0';
 	return true;
 }
 
@@ -534,7 +547,25 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 			Rec[RecIndex].bFmt[1] = 0;
 			Rec[RecIndex].iNext = 0;
 
-			if (!strcmp(tp, sg[SCRIPT_CALL].szKey))
+			if (!strcmp(tp, sg[SCRIPT_SERIAL].szKey))
+			{
+				int label = 0;
+				if ((tp = strtok(NULL, toksep)) != NULL)
+				{
+					sscanf(tp, "%d", &label);
+					if ((tp = strtok(NULL, tokval)) != NULL)
+					{
+						if (!ScanInt(&cnt, &pDest)) goto errmem;
+						while ((tp = strtok(NULL, tokval)) != NULL)
+						{
+							if (!ScanInt(&cnt, &pDest)) goto errmem;
+						}
+					}
+				}
+				Rec[RecIndex].iType = SCRIPT_SERIAL;
+				Rec[RecIndex].iNext = label;
+			}
+			else if (!strcmp(tp, sg[SCRIPT_CALL].szKey))
 			{
 				int label = -1;
 				if ((tp = strtok(NULL, toksep)) != NULL)
@@ -551,7 +582,7 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 			else if (!strcmp(tp, sg[SCRIPT_TXCHAR].szKey))
 			{
 				int label = -1;
-				if ((tp = strtok(NULL, toksep)) != NULL)
+				if ((tp = strtok(NULL, tokeol)) != NULL)
 				{
 					char *pSrc = tp;
 					while (*pSrc)
@@ -599,10 +630,24 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 			}
 			else if (!strcmp(tp, sg[SCRIPT_TXFILE].szKey))
 			{
-				if ((tp = strtok(NULL, tokeol)) != NULL)
+				int label = -1;
+				if ((tp = strtok(NULL, tokval)) != NULL)
 				{
-					if (!ScanStr(&cnt, &pDest)) goto errmem;	// Filename
+					if (!ScanInt(&cnt, &pDest)) goto errmem;	// Filetype
+					if ((tp = strtok(NULL, tokval)) != NULL)
+					{
+						if (!ScanStr(&cnt, &pDest)) goto errmem;	// Filename
+						if ((tp = strtok(NULL, tokval)) != NULL)
+						{
+							sscanf(tp, "%d", &label);
+							while ((tp = strtok(NULL, tokval)) != NULL)
+							{
+								if (!ScanInt(&cnt, &pDest)) goto errmem;
+							}
+						}
+					}
 					Rec[RecIndex].iType = SCRIPT_TXFILE;
+					Rec[RecIndex].iNext = label;				// Label to jump to on errors
 				}
 			}
 			else if (!strcmp(tp, sg[SCRIPT_TXBUF].szKey))
@@ -753,13 +798,13 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 				if ((tp = strtok(NULL, toksep)) != NULL)
 				{
 					sscanf(tp, "%d", &label);
-				}
-				if ((tp = strtok(NULL, tokval)) != NULL)
-				{
-					if (!ScanVar(&cnt, &pDest)) goto errmem;
-					while ((tp = strtok(NULL, tokval)) != NULL)
+					if ((tp = strtok(NULL, tokval)) != NULL)
 					{
-						if (!ScanInt(&cnt, &pDest)) goto errmem;
+						if (!ScanVar(&cnt, &pDest)) goto errmem;
+						while ((tp = strtok(NULL, tokval)) != NULL)
+						{
+							if (!ScanInt(&cnt, &pDest)) goto errmem;
+						}
 					}
 				}
 				Rec[RecIndex].iType = SCRIPT_TEST;

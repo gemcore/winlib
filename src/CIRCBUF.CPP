@@ -14,6 +14,10 @@
 **============================================================================
 */
 #include "circbuf.hpp"              /* Circular Buffer base class i/f */
+#include "LOG.H"
+
+#undef TRACE
+#define TRACE(...)
 
 /*==========================================================================
 |
@@ -39,22 +43,35 @@
 
 circbuf::circbuf()
 {
+   TRACE("circbuf() this=%08x\n", this);
 }
 
 circbuf::circbuf(long size)
 {
+   TRACE("circbuf(%d) this=%08x ", size, this);
    bufptr = new char[(int)size];
-   
+   TRACE("bufptr=%08x ", bufptr);
    end = bufptr+size-1; 
+   TRACE("end=%08x ", end);
    init();
+   TRACE("space=%d\n", getspace());
 }
 
 circbuf::~circbuf()
 {
-	if (bufptr)
+   TRACE("~circbuf() this=%08x\n",this);
+   if (bufptr)
    {
       delete bufptr;
    }
+}
+
+void circbuf::init(void)
+{
+   TRACE("init() ");
+   get = bufptr; 
+   put = bufptr; 
+   space = (long)(end - bufptr);
 }
 
 #pragma check_stack(off)            // turn stack checking off!

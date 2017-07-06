@@ -40,7 +40,7 @@ public:
    long getpos() { return (long)get; }
    long putpos() { return (long)put; }
 
-   void init(void) { get = bufptr; put = bufptr; space = (long)(end-bufptr); }
+   void init(void);// { get = bufptr; put = bufptr; space = (long)(end - bufptr); }
    long getsize();
    int insert(int);
    int remove(int *);

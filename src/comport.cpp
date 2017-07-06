@@ -14,15 +14,14 @@
 **============================================================================
 */
 #include "comport.h"
-//#include "canvas.h"
 #include "winex.h"
 #include "wassert.h"
 #include <stdio.h>
 #include "ascii.h"
-//#include "tty.h"
 #include "syserr.h"
+#include "LOG.H"
 
-//#define TRACE	printf
+#undef TRACE
 #define TRACE(...)
 
 #define ASCII_XON		DC1
@@ -42,12 +41,9 @@ ComPort::ComPort(int num,DWORD baud,BYTE parity,BYTE stop) :
    ctxbuf(512),
    crxbuf(512)
 {
-   // load COM prefix string and append port number
-//   char szTemp[ 10 ];
-//   LoadString( GETHINST(_hwnd), IDS_COMPREFIX, szTemp, sizeof(szTemp) );
-//   wsprintf( szPort, "%s%d", (LPSTR)szTemp, bPort );
    sprintf( szPort, "COM%d", bPort );
    
+   TRACE("ComPort(%s,%d,%d,%d) this=%08x\n", szPort, baud, parity, stop, this);
    osWrite.Offset = 0;
    osWrite.OffsetHigh = 0;
    osRead.Offset = 0;
@@ -57,6 +53,11 @@ ComPort::ComPort(int num,DWORD baud,BYTE parity,BYTE stop) :
 
    // Let the caller Resume explicitly
    //Resume ();
+}
+
+ComPort::~ComPort()
+{
+	TRACE("~ComPort() this=%08x\n",this);
 }
 
 void ComPort::Run ()

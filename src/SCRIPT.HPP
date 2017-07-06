@@ -30,20 +30,21 @@ enum SCRIPT_TYPE
 {
 	/* Reserved words. */
 	SCRIPT_DATA = 0,		// 00 data
-	SCRIPT_TXCHAR,			// 01 tx
-	SCRIPT_TXFILE,			// 02 txfile
-	SCRIPT_TXBUF,			// 03 txbuf
-	SCRIPT_RXCHAR,			// 04 rx
-	SCRIPT_SKIP,			// 05 skip
-	SCRIPT_DELAY,			// 06 delay
-	SCRIPT_TIMEOUT,			// 07 timeout
-	SCRIPT_EXIT,			// 08 exit
-	SCRIPT_VAR,				// 09 var
-	SCRIPT_GOTO,			// 10 goto
-	SCRIPT_TEST,			// 11 test
-	SCRIPT_BUF,				// 12 buf
-	SCRIPT_CALL,			// 13 call
-	SCRIPT_RET, 			// 14 call
+	SCRIPT_SERIAL,			// 01 serial
+	SCRIPT_TXCHAR,			// 02 tx
+	SCRIPT_TXFILE,			// 03 txfile
+	SCRIPT_TXBUF,			// 04 txbuf
+	SCRIPT_RXCHAR,			// 05 rx
+	SCRIPT_SKIP,			// 06 skip
+	SCRIPT_DELAY,			// 07 delay
+	SCRIPT_TIMEOUT,			// 08 timeout
+	SCRIPT_EXIT,			// 09 exit
+	SCRIPT_VAR,				// 10 var
+	SCRIPT_GOTO,			// 11 goto
+	SCRIPT_TEST,			// 12 test
+	SCRIPT_BUF,				// 13 buf
+	SCRIPT_CALL,			// 14 call
+	SCRIPT_RET, 			// 15 ret
 
 	/* Special tokens. */
 	SCRIPT_LABEL,			// 15 label
@@ -139,7 +140,7 @@ public:
 	int	GetRecCount(void) { return RecCount; }
 	SCRIPT_REC *GetVarRecPtr(int iNum);
 	bool PushReturn(void);
-	bool PopReturn(void);
+	bool PopReturn(int i=0);
 };
 
 #endif //#ifndef _SCRIPT_HPP 

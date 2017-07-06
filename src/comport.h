@@ -22,6 +22,7 @@ class ComPort : public ActiveObject
 {
 public:
    ComPort(int num,DWORD baud=CBR_9600,BYTE parity=NOPARITY,BYTE stop=ONESTOPBIT);
+   ~ComPort();
 
    bool Start();
    bool Stop();

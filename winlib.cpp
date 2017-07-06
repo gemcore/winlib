@@ -7,14 +7,14 @@
 #include "src\TMR.H"
 #include "src\comport.h"
 
-#undef TRACE
-#define TRACE(...)
+//#undef TRACE
+//#define TRACE(...)
 
 #define RUN_TESTING
 //#define COM_TESTING
 //#define TMR_TESTING
 
-ComPort com(3, CBR_115200);
+ComPort *com = NULL;
 
 int rxpacket_len = 0;
 int rxpacket_cnt = 0;
@@ -38,19 +38,50 @@ void ComPort::Process(void)
 
 }
 
-/*
-** Functions required by slip.cpp module to interact with the hardware.
-*/
-int recv_char(void)
+extern "C"
 {
-	return com.RxGetch();
+	int COM_Init(int port,long baud)
+	{
+		if (com == NULL)
+		{
+			com = new ComPort(port, baud);
+			if (com->Start())
+			{
+				com->Resume();
+				return 0;
+			}
+		}
+		return -1;
+	}
+
+	void COM_Term(void)
+	{
+		if (com)
+		{
+			com->Stop();
+			com->Sleep(100);
+
+			delete com;
+			com = NULL;
+		}
+	}
+
+	int COM_recv_char(void)
+	{
+		return com->RxGetch();
+	}
+
+	int COM_send_char(byte c)
+	{
+		return com->Write(c);
+	}
+
+	bool COM_Write(char *buf, int len)
+	{
+		return com->Write(buf, len);
+	}
 }
 
-int send_char(byte c)
-{
-	com.Write(c);
-	return 0;
-}
 
 #ifdef RUN_TESTING
 /*
@@ -72,27 +103,36 @@ int send_char(byte c)
 #define TXSCRIPT_EXIT			 -1
 #define TXSCRIPT_FILE_NOT_FOUND  -2
 #define TXSCRIPT_ERROR           -3
-#define TXSCRIPT_TIMEOUT         -4
-#define TXSCRIPT_LABEL_NOT_FOUND -5
-#define TXSCRIPT_VAR_NOT_FOUND   -6
-#define TXSCRIPT_BUF_NOT_FOUND   -7
-#define TXSCRIPT_VAL_UNDEFINED   -8
-#define TXSCRIPT_RET_UNDEFINED   -9
-#define TXSCRIPT_CALL_OVERFLOW  -10
-#define TXSCRIPT_ABORTED        -11
-#define TXSCRIPT_OTHER          -12
+#define TXSCRIPT_COMPORT_NA      -4
+#define TXSCRIPT_TIMEOUT         -5
+#define TXSCRIPT_LABEL_NOT_FOUND -6
+#define TXSCRIPT_VAR_NOT_FOUND   -7
+#define TXSCRIPT_BUF_NOT_FOUND   -8
+#define TXSCRIPT_VAL_UNDEFINED   -9
+#define TXSCRIPT_RET_UNDEFINED  -10
+#define TXSCRIPT_CALL_OVERFLOW  -11
+#define TXSCRIPT_ABORTED        -12
+#define TXSCRIPT_OTHER          -13
 
 class TxScript : public ActiveObject
 {
 public:
 	SCRIPT *pScript;
-	ComPort *com;
+	//ComPort *com;
 	int Result;
 	Event e;
 
-	TxScript(ComPort *comptr)
-		: com(comptr)
-	{ }
+	//TxScript(ComPort *comptr)
+	//	: com(comptr)
+	TxScript()
+	{
+		TRACE("TxScript() this=%08x\n", this); 
+	}
+
+	~TxScript()
+	{
+		TRACE("~TxScript() this=%08x\n", this);
+	}
 
 	char *getname() { return "TxScript"; }
 
@@ -214,7 +254,7 @@ void TxScript::Run()
 				}
 			}
 			putchar('\n');
-			com->Write(pRecData->cArray, rec.iLen);
+			COM_Write(pRecData->cArray, rec.iLen);
 		}
 		break;
 
@@ -282,7 +322,7 @@ void TxScript::Run()
 					{
 						printf("\\x%02X", c);
 					}
-					com->Write((byte)c);
+					COM_send_char((byte)c);
 				}
 			}
 			putchar('\n');
@@ -316,13 +356,13 @@ void TxScript::Run()
 				if (size > BUFSIZE)
 				{
 					bf.ReadfromFile(BUFSIZE, buf);
-					com->Write((char *)&buf[0], BUFSIZE);
+					COM_Write((char *)&buf[0], BUFSIZE);
 					size -= BUFSIZE;
 				}
 				else
 				{
 					bf.ReadfromFile(size, buf);
-					com->Write((char *)&buf[0], size);
+					COM_Write((char *)&buf[0], size);
 					break;
 				}
 				if (_isDying)
@@ -386,7 +426,7 @@ void TxScript::Run()
 					bFound = true;
 					break;
 				}
-				while ((c = recv_char()) != -1)
+				while ((c = COM_recv_char()) != -1)
 				{
 					if (c == (pRecData->cArray[Cnt] & 0xFF))
 					{
@@ -497,7 +537,7 @@ void TxScript::Run()
 					bFound = true;
 					break;
 				}
-				while (!bFound && (c = recv_char()) != -1)
+				while (!bFound && (c = COM_recv_char()) != -1)
 				{
 					if (isprint(c))
 						putchar(c);
@@ -824,6 +864,37 @@ void TxScript::Run()
 		}
 		break;
 
+		case SCRIPT_SERIAL:
+		{
+			pRecData = (SCRIPT_RECDATA*)(rec.pData);
+			printf("serial %d", rec.iNext);
+			int i;
+			int n = rec.iLen / sizeof(int);
+			for (i = 0; i < n; i++)
+			{
+				printf(",%d", pRecData->iArray[i]);
+			}
+			putchar('\n');
+			if (rec.iNext == 1)
+			{
+				/* Serial port testing. */
+				if (n >= 1)
+				{
+					if (COM_Init(pRecData->iArray[0], (n >= 2)?(long)pRecData->iArray[1]:CBR_9600))
+					{
+						Result = TXSCRIPT_COMPORT_NA;
+						bSuccess = FALSE;
+					}
+				}
+			}
+			else if (rec.iNext == 0)
+			{
+				COM_Term();
+			}
+			Sleep(100);
+		}
+		break;
+
 		case SCRIPT_LABEL:
 		{
 			printf("%d:\n", rec.iNext);
@@ -872,13 +943,6 @@ int main()
 
 	TMR_Init(100);	// 100ms timebase
 
-	/* Serial port testing. */
-	if (!com.Start())
-	{
-		exit(-1);
-	}
-	com.Resume();
-
 #ifdef RUN_TESTING
 	SCRIPT *sp = new SCRIPT();
 	if (sp)
@@ -890,7 +954,7 @@ int main()
 		if ((rc = sp->Load("c:\\temp\\test.spt")) == 0)
 		{
 			/* Initialize the TxScript processing. */
-			TxScript *txscript = new TxScript(&com);
+			TxScript *txscript = new TxScript(); // com);
 
 			printf("Run\n");
 			rc = txscript->RunScript(sp);
@@ -962,8 +1026,7 @@ int main()
 	TMR_Event(0, (CTimerEvent *)&atmr, PERIODIC);
 	putchar('\n');
 #endif
-
-	com.Stop();
+	COM_Term();
 	TMR_Term();
 
 	printf("exit\n\n");
