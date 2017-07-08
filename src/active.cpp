@@ -20,7 +20,11 @@ ActiveObject::ActiveObject ()
 #pragma warning(default: 4355)
 {
 	// Create a waitable timer.
+#ifdef _CONSOLE
 	hTimer = CreateWaitableTimer(NULL, TRUE, (WCHAR *)"WaitableTimer");
+#else
+	hTimer = CreateWaitableTimer(NULL, TRUE, "WaitableTimer");
+#endif
 	if (NULL == hTimer)
 	{
 		printf("CreateWaitableTimer failed (%d)\n", GetLastError());

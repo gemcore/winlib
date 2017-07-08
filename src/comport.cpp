@@ -100,9 +100,11 @@ bool ComPort::Start()
    Lock lock(_mutex);
 
    TRACE("ComPort%d::Start()\n",bPort);
-
+#ifdef _CONSOLE
    MultiByteToWideChar(CP_ACP, 0, szPort, -1, swPort, sizeof(swPort));
-
+#else
+   strncpy(swPort, szPort, sizeof(swPort));
+#endif
    if (fConnected)
    {
       TRACE("Connection already open!\n");

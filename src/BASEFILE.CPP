@@ -47,8 +47,11 @@ BASEFILE::~BASEFILE()
 
 BOOL BASEFILE::InitFile(char *szBaseName)
 {	
+#ifdef _CONSOLE
 	MultiByteToWideChar(CP_ACP, 0, szBaseName, -1, v_szBaseName, sizeof(v_szBaseName));
-
+#else
+	strncpy(v_szBaseName, szBaseName, sizeof(v_szBaseName));
+#endif
 	if ((IsFile())||(hbase != INVALID_HANDLE_VALUE)) 
 	{
 		CloseFile();
@@ -68,8 +71,11 @@ BOOL BASEFILE::InitFile(char *szBaseName)
 
 BOOL BASEFILE::InitReadFile(char *szBaseName)
 {
+#ifdef _CONSOLE
 	MultiByteToWideChar(CP_ACP, 0, szBaseName, -1, v_szBaseName, sizeof(v_szBaseName));
-
+#else
+	strncpy(v_szBaseName, szBaseName, sizeof(v_szBaseName));
+#endif
 	if ((IsFile()) || (hbase != INVALID_HANDLE_VALUE))
 	{
 		CloseFile();
@@ -90,8 +96,11 @@ BOOL BASEFILE::InitReadFile(char *szBaseName)
 
 BOOL BASEFILE::InitWriteFile(char *szBaseName)
 {	
+#ifdef _CONSOLE
 	MultiByteToWideChar(CP_ACP, 0, szBaseName, -1, v_szBaseName, sizeof(v_szBaseName));
-
+#else
+	strncpy(v_szBaseName, szBaseName,sizeof(v_szBaseName));
+#endif
 	if ((IsFile())||(hbase != INVALID_HANDLE_VALUE)) 
 	{
 		CloseFile(); //reinit

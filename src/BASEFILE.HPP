@@ -38,8 +38,11 @@ class BASEFILE
 protected:
 	HANDLE hbase;
 	BOOL v_bFileExists;
+#ifdef _CONSOLE
 	TCHAR v_szBaseName[NAME_LENGTH];
-
+#else
+	char v_szBaseName[NAME_LENGTH];
+#endif
 public:	
 
 	BASEFILE();

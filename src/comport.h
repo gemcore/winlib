@@ -40,6 +40,8 @@ public:
    int  RxGetch( void );
    long RxCount( void );
 
+   bool IsConnected(void) { return fConnected; }
+
 private:
    void InitThread() {}
    void Run();
@@ -50,10 +52,12 @@ private:
 
    circbuf ctxbuf;
    circbuf crxbuf;
-
    char     szPort[ 15 ];
+#ifdef _CONSOLE
    WCHAR	swPort[ 15 ];
-
+#else
+   char		swPort[15];
+#endif
    bool     fConnected;
    HANDLE   id;
    BYTE     bPort;
