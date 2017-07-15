@@ -56,7 +56,8 @@ SCRIPT_GRAMMER sg[]=
 	"test",		// SCRIPT_TEST
 	"buf",		// SCRIPT_BUF
 	"call",		// SCRIPT_CALL
-	"ret"		// SCRIPT_RET
+	"ret",		// SCRIPT_RET
+	"log"		// SCRIPT_LOG
 };
 
 char *toksep = " :,\t\n";
@@ -647,6 +648,28 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 						}
 					}
 					Rec[RecIndex].iType = SCRIPT_TXFILE;
+					Rec[RecIndex].iNext = label;				// Label to jump to on errors
+				}
+			}
+			else if (!strcmp(tp, sg[SCRIPT_LOG].szKey))
+			{
+				int label = -1;
+				if ((tp = strtok(NULL, tokval)) != NULL)
+				{
+					if (!ScanInt(&cnt, &pDest)) goto errmem;	// Enable
+					if ((tp = strtok(NULL, tokval)) != NULL)
+					{
+						if (!ScanStr(&cnt, &pDest)) goto errmem;	// Filename
+						if ((tp = strtok(NULL, tokval)) != NULL)
+						{
+							sscanf(tp, "%d", &label);
+							while ((tp = strtok(NULL, tokval)) != NULL)
+							{
+								if (!ScanInt(&cnt, &pDest)) goto errmem;
+							}
+						}
+					}
+					Rec[RecIndex].iType = SCRIPT_LOG;
 					Rec[RecIndex].iNext = label;				// Label to jump to on errors
 				}
 			}

@@ -48,16 +48,17 @@
 
 class LOG : BASEFILE
 {
-   int bflag;
+   bool bflag;
 
 public:
-	LOG(char *filename, int flag=1);
+	LOG(char *filename, bool flag=true);
    ~LOG();
    
    void Flush(void);
    void PutChar(int c);
    void PutStr(char *s);
    int Printf(const char *format,...);
+   void Enable(bool flag) { bflag = flag; }
 };
 
 extern LOG *log;
@@ -66,6 +67,7 @@ extern "C"
 {
 	void LOG_Init(char *filename);
 	void LOG_Term(void);
+	void LOG_Enable(bool flag);
 }
 
 #endif

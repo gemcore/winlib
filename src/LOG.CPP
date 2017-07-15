@@ -32,7 +32,7 @@
 |  class methods
 |
 ===========================================================================*/
-LOG::LOG(char *filename, int flag) : BASEFILE(false, filename),
+LOG::LOG(char *filename, bool flag) : BASEFILE(false, filename),
 	bflag(flag)
 {
 }
@@ -43,7 +43,10 @@ LOG::~LOG()
 }
 
 void LOG::PutChar(int c)
-{  
+{ 
+	if (!bflag)
+		return;
+
 	/* Log character to the file. */
 	BASEFILE::WritetoFile((BYTE)c);
 
@@ -84,10 +87,10 @@ extern "C"
 		if (log == NULL)
 		{
 			log = new LOG(filename);
-			if (log)
-			{
-				puts("LOG_Init\n");
-			}
+			//if (log)
+			//{
+			//	puts("LOG_Init\n");
+			//}
 		}
 	}
 
@@ -95,9 +98,17 @@ extern "C"
 	{
 		if (log)
 		{
-			puts("LOG_Term\n");
+			//puts("LOG_Term\n");
 			delete log;
 			log = NULL;
+		}
+	}
+
+	void LOG_Enable(bool flag)
+	{
+		if (log)
+		{			
+			log->Enable(flag);
 		}
 	}
 }

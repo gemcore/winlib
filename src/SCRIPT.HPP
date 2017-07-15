@@ -45,6 +45,7 @@ enum SCRIPT_TYPE
 	SCRIPT_BUF,				// 13 buf
 	SCRIPT_CALL,			// 14 call
 	SCRIPT_RET, 			// 15 ret
+	SCRIPT_LOG, 			// 16 log
 
 	/* Special tokens. */
 	SCRIPT_LABEL,			// 15 label

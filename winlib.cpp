@@ -901,6 +901,38 @@ void TxScript::Run()
 		}
 		break;
 
+		case SCRIPT_LOG:
+		{
+			char *filename = "";
+			pRecData = (SCRIPT_RECDATA*)(rec.pData);
+			int enable = 0;
+			if (rec.iLen >= 4)
+			{
+				enable = pRecData->iArray[0];					/* the Enable: 0=off, 1=on */
+				//printf("%d", enable);
+				if (rec.iLen > 4)
+				{
+					filename = &pRecData->cArray[sizeof(int)];	/* the Filename */
+					//printf(",%s", filename);
+					LOG_Term();
+					LOG_Init(filename);
+				}
+				LOG_Enable(true);
+				if (enable)
+				{
+					TRACE("> %03d: log 1\n", rec.iNum);
+				}
+				else
+				{
+					TRACE("log 0\n...\n");
+					LOG_Enable(enable);
+				}
+			}
+			else
+				TRACE("log\n");
+		}
+		break;
+
 		default:
 			printf("%s: [%d] Type Error!\n", getname(), rec.iType);
 			Result = TXSCRIPT_ERROR;
