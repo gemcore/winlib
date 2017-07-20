@@ -24,7 +24,7 @@
 #include "LOG.H"		// Capture putchar & printf output to a log file
 
 #undef TRACE
-#define TRACE(...)
+#define TRACE(fmt, ...)
 
 #ifdef _DEBUG
 #define DBG_NEW new ( _NORMAL_BLOCK , __FILE__ , __LINE__ )
@@ -88,7 +88,8 @@ void SCRIPT::Display(char *s)
 	printf("| ");
 	while (*s)
 	{
-		printf("%c", *s++);
+		printf("%c", *s);
+		s++;
 	}
 	printf("\n");
 }
@@ -901,7 +902,7 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
         }
     }
 	RecCount = RecIndex;
-	TRACE("%d records, bytes %d used / %d remaining\n", RecCount, Data->Ptr - Data->Space, Data->Size - (Data->Ptr - Data->Space));
+	printf("[%d] records, bytes %d used / %d remaining\n", RecCount, Data->Ptr - Data->Space, Data->Size - (Data->Ptr - Data->Space));
 	lasterr = 0;
 	FileClose();
 	return 0;

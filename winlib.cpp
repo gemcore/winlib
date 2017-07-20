@@ -7,8 +7,8 @@
 #include "src\TMR.H"
 #include "src\comport.h"
 
-//#undef TRACE
-//#define TRACE(...)
+#undef TRACE
+#define TRACE(...)
 
 #define RUN_TESTING
 //#define COM_TESTING
@@ -983,7 +983,9 @@ int main()
 
 		/* Load and parse the SCRIPT records from a file. */
 		printf("Load\n");
-		if ((rc = sp->Load("c:\\temp\\test.spt")) == 0)
+		rc = sp->Load("c:\\temp\\test.spt");
+
+		if (rc == 0)
 		{
 			/* Initialize the TxScript processing. */
 			TxScript *txscript = new TxScript(); // com);
