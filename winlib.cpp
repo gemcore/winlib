@@ -995,29 +995,31 @@ int main()
 
 			/* Terminate the TxScript thread. */
 			delete txscript;
-		}
-		printf("Result=%d\n", rc);
-		sp->Dump();
-		/* Check variable 2. */
-		SCRIPT_REC *r = sp->GetVarRecPtr(6);
-		if (r != NULL)
-		{
-			SCRIPT_RECDATA *d = (SCRIPT_RECDATA *)r->pData;
-			if (d->bArray[0] != 0x00)
+
+			printf("Result=%d\n", rc);
+
+			sp->Dump();
+			/* Check variable 2. */
+			SCRIPT_REC *r = sp->GetVarRecPtr(6);
+			if (r != NULL)
 			{
-				//MEM_Dump((unsigned char *)d->iArray, r->iLen, 0L);
-				printf("var 2:");
-				//for (int i = 0; i < 5; i++)
-				//{
-				//	printf("\\x%08X,", d->iArray[i]);
-				//}
-				//printf(" as char:");
-				for (int i = 0; i < 5; i++)
+				SCRIPT_RECDATA *d = (SCRIPT_RECDATA *)r->pData;
+				if (d->bArray[0] != 0x00)
 				{
-					printf("%c,", (char)d->bArray[i]);
+					//MEM_Dump((unsigned char *)d->iArray, r->iLen, 0L);
+					printf("var 2:");
+					//for (int i = 0; i < 5; i++)
+					//{
+					//	printf("\\x%08X,", d->iArray[i]);
+					//}
+					//printf(" as char:");
+					for (int i = 0; i < 5; i++)
+					{
+						printf("%c,", (char)d->bArray[i]);
+					}
+					printf("\nublox version: %c.%c.%c.%c%c\n",
+						(char)d->bArray[0], (char)d->bArray[1], (char)d->bArray[2], (char)d->bArray[3], (char)d->bArray[4]);
 				}
-				printf("\nublox version: %c.%c.%c.%c%c\n",
-					(char)d->bArray[0], (char)d->bArray[1], (char)d->bArray[2], (char)d->bArray[3], (char)d->bArray[4]);
 			}
 		}
 		delete sp;

@@ -37,6 +37,7 @@
 #include "BASEFILE.HPP"
 
 #define putchar(c)	      do{ if (log) log->PutChar(c); }while(0)
+#define puts(s)		      do{ if (log) log->PutStr(s); }while(0)
 #define printf(fmt, ...)  do{ if (log) log->Printf(fmt, __VA_ARGS__); }while(0)
 #define TRACE(fmt, ...)   do{ if (log) log->Printf(fmt, __VA_ARGS__); }while(0)
 

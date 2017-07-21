@@ -14,6 +14,7 @@
 **============================================================================
 */
 #include "log.h"
+#undef puts
 #undef putchar
 #undef printf
 #define _INC_STDIO
@@ -49,17 +50,16 @@ void LOG::PutChar(int c)
 
 	/* Log character to the file. */
 	BASEFILE::WritetoFile((BYTE)c);
-
 	/* Out character to the console. */
 	putchar(c);
 }
 
 void LOG::PutStr(char *s)
 {
-	while (*s)
-	{
-		PutChar(*s++);
-	}
+	/* Log string to the file. */
+	BASEFILE::WritetoFile((DWORD)strlen(s), (BYTE*)s);
+	/* Out string to the console. */
+	puts(s);
 }
 
 int LOG::Printf(const char *format, ...)
@@ -68,7 +68,10 @@ int LOG::Printf(const char *format, ...)
 	va_start(arg_ptr, format);
 	char s[512];                     /* formatted output buffer */
 	int num_chars = vsprintf_s(s, format, arg_ptr);
-	PutStr(s);
+	/* Log string to the file. */
+	BASEFILE::WritetoFile((DWORD)num_chars, (BYTE*)s);
+	/* Out string to the console. */
+	puts(s);
 	va_end(arg_ptr);
 	return num_chars;
 }
