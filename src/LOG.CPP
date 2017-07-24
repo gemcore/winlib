@@ -33,33 +33,32 @@
 |  class methods
 |
 ===========================================================================*/
-LOG::LOG(char *filename, bool flag) : BASEFILE(false, filename),
-	bflag(flag)
+LOG::LOG(char *filename) : BASEFILE(false, filename),
+	bflag(true)
 {
-}
-
-LOG::~LOG()
-{
-	Flush();                         // flush buffer
 }
 
 void LOG::PutChar(int c)
 { 
-	if (!bflag)
-		return;
-
-	/* Log character to the file. */
-	BASEFILE::WritetoFile((BYTE)c);
+	if (bflag)
+	{
+		/* Log character to the file. */
+		BASEFILE::WritetoFile((BYTE)c);
+	}
 	/* Out character to the console. */
-	putchar(c);
+	if (!qflag)
+	{
+		fputc(c,stderr);
+	}
 }
 
 void LOG::PutStr(char *s)
 {
-	/* Log string to the file. */
-	BASEFILE::WritetoFile((DWORD)strlen(s), (BYTE*)s);
-	/* Out string to the console. */
-	puts(s);
+	/* Output a string. */
+	while (*s)
+	{
+		PutChar(*s++);
+	}
 }
 
 int LOG::Printf(const char *format, ...)
@@ -68,10 +67,8 @@ int LOG::Printf(const char *format, ...)
 	va_start(arg_ptr, format);
 	char s[512];                     /* formatted output buffer */
 	int num_chars = vsprintf_s(s, format, arg_ptr);
-	/* Log string to the file. */
-	BASEFILE::WritetoFile((DWORD)num_chars, (BYTE*)s);
-	/* Out string to the console. */
-	puts(s);
+	/* Output a string. */
+	PutStr(s);
 	va_end(arg_ptr);
 	return num_chars;
 }
@@ -90,10 +87,6 @@ extern "C"
 		if (log == NULL)
 		{
 			log = new LOG(filename);
-			//if (log)
-			//{
-			//	puts("LOG_Init\n");
-			//}
 		}
 	}
 
@@ -101,7 +94,7 @@ extern "C"
 	{
 		if (log)
 		{
-			//puts("LOG_Term\n");
+			log->Flush();
 			delete log;
 			log = NULL;
 		}

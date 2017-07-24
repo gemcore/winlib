@@ -102,11 +102,13 @@ private:
 	char *tp;				// pointer to current token in line buffer
 	char *pData;			// pointer to current Data space destination
 
+	int ReadBinFile(char *filename);
+	int SaveBinFile(char *filename);
 	bool IsDataSpace(int cnt) { return (Data->Size - (Data->Ptr - Data->Space) - cnt) >= 0; }
 	int FileLineNum(void) { return linenum; }
-	int FileOpen(char *filename) {	return ((fp = fopen(filename, "r")) == NULL) ? 0 : 1; }
-	void FileClose() { fclose(fp); }
-	char *FileGetLine();
+	int FileOpen(char *filename);
+	void FileClose(void);
+	char *FileGetLine(void);
 	int ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt );
 	void ReadError(char *s);
 	void Display(char *s);
@@ -120,13 +122,13 @@ public:
 	bool dflag;				// flag to call Dump() after parsing results
 	struct DataSpace *Data;	// allocated Data space for each record's specific data
 
-	SCRIPT(bool dump=true);
-	~SCRIPT();
+	SCRIPT();
+	virtual ~SCRIPT();
 
 	void Dump(void);
-	int Load(char *szFileName);
-	int Loadbin(char *szFilename);
-	int Savebin(char *szFilename);
+	int Load(char *fileName);
+	int Loadbin(char *filename);
+	int Savebin(char *filename);
 
 	SCRIPT_REC *GetRec(int iNum);
 	int GetNextRec(SCRIPT_REC *pRec);

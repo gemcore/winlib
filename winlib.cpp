@@ -1,14 +1,27 @@
 // winlib.cpp : Defines the entry point for the console application.
 //
 
+#define _CRTDBG_MAP_ALLOC  
 #include "stdafx.h"
 #include "windows.h"
 #include "src\LOG.H"		// Capture putchar & printf output to a log file
 #include "src\TMR.H"
 #include "src\comport.h"
+//#include <iostream>     /* C++ stream input/output class */
+//using namespace std;
+
+#ifdef _DEBUG
+#define DBG_NEW new ( _NORMAL_BLOCK , __FILE__ , __LINE__ )
+// Replace _NORMAL_BLOCK with _CLIENT_BLOCK if you want the
+// allocations to be of _CLIENT_BLOCK type
+#else
+#define DBG_NEW new
+#endif
 
 #undef TRACE
 #define TRACE(...)
+#undef DEBUG
+#define DEBUG(...)
 
 #define RUN_TESTING
 //#define COM_TESTING
@@ -91,55 +104,52 @@ extern "C"
 #include "src\SCRIPT.HPP"
 #include "src\TMR.H"
 
-/* TxScript Rx initial timeout maximum value. */
+/* xScript Rx initial timeout maximum value. */
 #define TMR_TIMEOUT_MAX	32000
 
 /* Used in defining the Read block size. */
 #define BUFSIZE			128
 
-/* TxScript return result codes. */
-#define TXSCRIPT_PROCESSING       1
-#define TXSCRIPT_SUCCESS          0
-#define TXSCRIPT_EXIT			 -1
-#define TXSCRIPT_FILE_NOT_FOUND  -2
-#define TXSCRIPT_ERROR           -3
-#define TXSCRIPT_COMPORT_NA      -4
-#define TXSCRIPT_TIMEOUT         -5
-#define TXSCRIPT_LABEL_NOT_FOUND -6
-#define TXSCRIPT_VAR_NOT_FOUND   -7
-#define TXSCRIPT_BUF_NOT_FOUND   -8
-#define TXSCRIPT_VAL_UNDEFINED   -9
-#define TXSCRIPT_RET_UNDEFINED  -10
-#define TXSCRIPT_CALL_OVERFLOW  -11
-#define TXSCRIPT_ABORTED        -12
-#define TXSCRIPT_OTHER          -13
+/* xScript return result codes. */
+#define XSCRIPT_PROCESSING       1
+#define XSCRIPT_SUCCESS          0
+#define XSCRIPT_EXIT			 -1
+#define XSCRIPT_FILE_NOT_FOUND  -2
+#define XSCRIPT_ERROR           -3
+#define XSCRIPT_COMPORT_NA      -4
+#define XSCRIPT_TIMEOUT         -5
+#define XSCRIPT_LABEL_NOT_FOUND -6
+#define XSCRIPT_VAR_NOT_FOUND   -7
+#define XSCRIPT_BUF_NOT_FOUND   -8
+#define XSCRIPT_VAL_UNDEFINED   -9
+#define XSCRIPT_RET_UNDEFINED  -10
+#define XSCRIPT_CALL_OVERFLOW  -11
+#define XSCRIPT_ABORTED        -12
+#define XSCRIPT_OTHER          -13
 
-class TxScript : public ActiveObject
+class xScript : public ActiveObject
 {
 public:
 	SCRIPT *pScript;
-	//ComPort *com;
 	int Result;
 	Event e;
 
-	//TxScript(ComPort *comptr)
-	//	: com(comptr)
-	TxScript()
+	xScript()
 	{
-		TRACE("TxScript() this=%08x\n", this); 
+		TRACE("xScript() this=%08x\n", this); 
 	}
 
-	~TxScript()
+	~xScript()
 	{
-		TRACE("~TxScript() this=%08x\n", this);
+		TRACE("~xScript() this=%08x\n", this);
 	}
 
-	char *getname() { return "TxScript"; }
+	char *getname() { return "xScript"; }
 
 	int RunScript(SCRIPT *script)
 	{
 		pScript = script;
-		Result = TXSCRIPT_PROCESSING;
+		Result = XSCRIPT_PROCESSING;
 		/* Run thread. */
 		Resume();
 		/* Wait for result from script processing. */
@@ -156,7 +166,7 @@ private:
 
 };
 
-void TxScript::Run()
+void xScript::Run()
 {
 	SCRIPT_REC rec;
 	SCRIPT_RECDATA *pRecData;
@@ -167,7 +177,8 @@ void TxScript::Run()
 	int Timeout = TMR_TIMEOUT_MAX;
 	TMR_Start(tmr, Timeout);
 
-	TRACE("%s: Running...\n", getname());
+	//TRACE("%s: Running...\n", getname());
+	printf("Run\n");
 	pScript->SetRecord(0);
 
 	while (bSuccess && pScript->GetNextRec(&rec))
@@ -180,11 +191,44 @@ void TxScript::Run()
 		if (_isDying)
 		{
 			printf("%s: Aborted!\n", getname());
-			Result = TXSCRIPT_ABORTED;
+			Result = XSCRIPT_ABORTED;
 			break;
 		}
 
+		if (rec.iType == SCRIPT_LOG)
+		{
+			char *filename = "";
+			pRecData = (SCRIPT_RECDATA*)(rec.pData);
+			int enable = 0;
+			if (rec.iLen >= 4)
+			{
+				LOG_Enable(true);
+				enable = pRecData->iArray[0];					/* the Enable: 0=off, 1=on */
+				if (rec.iLen > 4)
+				{
+					filename = &pRecData->cArray[sizeof(int)];	/* the Filename */
+					LOG_Term();
+					LOG_Init(filename);
+				}
+				printf("> %03d: log %d", rec.iNum, enable);
+
+				if (enable)
+				{
+					printf(",%s\n", filename);
+					log->Flush();
+				}
+				else
+				{
+					printf("\n> ...\n");
+					log->Flush();
+					LOG_Enable(enable);
+				}
+			}
+			continue;
+		}
+
 		printf("> %03d: ", rec.iNum);
+
 		switch (rec.iType)
 		{
 		case SCRIPT_CALL:
@@ -201,7 +245,7 @@ void TxScript::Run()
 				if (!pScript->PushReturn())
 				{
 					printf("\n%s: Call_Overflow!\n", getname());
-					Result = TXSCRIPT_CALL_OVERFLOW;
+					Result = XSCRIPT_CALL_OVERFLOW;
 					bSuccess = false;
 					break;
 				}
@@ -211,7 +255,7 @@ void TxScript::Run()
 			else
 			{
 				TRACE("\n%s: [%d] Label_Not_Found!\n", getname(), rec.iNext);
-				Result = TXSCRIPT_LABEL_NOT_FOUND;
+				Result = XSCRIPT_LABEL_NOT_FOUND;
 				break;
 			}
 			putchar('\n');
@@ -227,7 +271,7 @@ void TxScript::Run()
 			if (!pScript->PopReturn())
 			{
 				printf("\n%s: Ret_Undefined!\n", getname());
-				Result = TXSCRIPT_RET_UNDEFINED;
+				Result = XSCRIPT_RET_UNDEFINED;
 				bSuccess = false;					 
 				break;
 			}
@@ -289,7 +333,7 @@ void TxScript::Run()
 					else
 					{
 						printf("\n%s: [%d] Buf_Not_Found!\n", getname(), buf);
-						Result = TXSCRIPT_BUF_NOT_FOUND;
+						Result = XSCRIPT_BUF_NOT_FOUND;
 						bSuccess = false;
 						break;
 					}
@@ -346,7 +390,7 @@ void TxScript::Run()
 			{
 				printf("\n%s: File_Not_Found!\n", getname());
 				bSuccess = false;
-				Result = TXSCRIPT_FILE_NOT_FOUND;
+				Result = XSCRIPT_FILE_NOT_FOUND;
 				break;
 			}
 			size = bf.Filesize();
@@ -368,7 +412,7 @@ void TxScript::Run()
 				if (_isDying)
 				{
 					printf("%s: Aborted!\n", getname());
-					Result = TXSCRIPT_ABORTED;
+					Result = XSCRIPT_ABORTED;
 					bSuccess = false;
 					break;
 				}
@@ -394,7 +438,7 @@ void TxScript::Run()
 				if (_isDying)
 				{
 					printf("\n%s: Aborted!\n", getname());
-					Result = TXSCRIPT_ABORTED;
+					Result = XSCRIPT_ABORTED;
 					bSuccess = false;
 					break;
 				}
@@ -405,7 +449,7 @@ void TxScript::Run()
 					{
 						// then do Timeout error.
 						printf("\n%s: Timeout!\n", getname());
-						Result = TXSCRIPT_TIMEOUT;
+						Result = XSCRIPT_TIMEOUT;
 						bSuccess = false;
 						break;
 					}
@@ -419,7 +463,7 @@ void TxScript::Run()
 					else
 					{
 						printf("\n%s: [%d] Label_Not_Found!\n", getname(), rec.iNext);
-						Result = TXSCRIPT_LABEL_NOT_FOUND;
+						Result = XSCRIPT_LABEL_NOT_FOUND;
 						bSuccess = false;
 						break;
 					}
@@ -495,7 +539,7 @@ void TxScript::Run()
 				else
 				{
 					printf("\n%s: [%d] Var_Not_Found!\n", getname(), var);
-					Result = TXSCRIPT_VAR_NOT_FOUND;
+					Result = XSCRIPT_VAR_NOT_FOUND;
 					bSuccess = false;
 					break;
 				}
@@ -505,7 +549,7 @@ void TxScript::Run()
 				if (_isDying)
 				{
 					printf("\n%s: Aborted!\n", getname());
-					Result = TXSCRIPT_ABORTED;
+					Result = XSCRIPT_ABORTED;
 					bSuccess = false;
 					break;
 				}
@@ -516,7 +560,7 @@ void TxScript::Run()
 					{
 						// then do Timeout error.
 						printf("\n%s: Timeout!\n", getname());
-						Result = TXSCRIPT_TIMEOUT;
+						Result = XSCRIPT_TIMEOUT;
 						bSuccess = false;
 						break;
 					}
@@ -530,7 +574,7 @@ void TxScript::Run()
 					else
 					{
 						printf("\n%s: [%d] Label_Not_Found!\n", getname(), rec.iNext);
-						Result = TXSCRIPT_LABEL_NOT_FOUND;
+						Result = XSCRIPT_LABEL_NOT_FOUND;
 						bSuccess = false;
 						break;
 					}
@@ -578,7 +622,7 @@ void TxScript::Run()
 				if (_isDying)
 				{
 					printf("\n%s: Aborted!\n", getname());
-					Result = TXSCRIPT_ABORTED;
+					Result = XSCRIPT_ABORTED;
 					break;
 				}
 				Sleep(100L);
@@ -606,7 +650,7 @@ void TxScript::Run()
 			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 			if (rec.iLen == 0)
 			{
-				Result = TXSCRIPT_EXIT;
+				Result = XSCRIPT_EXIT;
 			}
 			else
 			{
@@ -748,7 +792,7 @@ void TxScript::Run()
 					else
 					{
 						printf("\n%s: [%d] Var_Not_Found!\n", getname(), var);
-						Result = TXSCRIPT_VAR_NOT_FOUND;
+						Result = XSCRIPT_VAR_NOT_FOUND;
 						bSuccess = false;
 						break;
 					}
@@ -762,7 +806,7 @@ void TxScript::Run()
 			else
 			{
 				TRACE("\n%s: [%d] Label_Not_Found!\n", getname(), rec.iNext);
-				Result = TXSCRIPT_LABEL_NOT_FOUND;
+				Result = XSCRIPT_LABEL_NOT_FOUND;
 				bSuccess = false;
 				break;
 			}
@@ -855,7 +899,7 @@ void TxScript::Run()
 				else
 				{
 					printf("\n%s: [%d] Var_Not_Found!\n", var);
-					Result = TXSCRIPT_VAR_NOT_FOUND;
+					Result = XSCRIPT_VAR_NOT_FOUND;
 					bSuccess = false;
 					break;
 				}
@@ -882,7 +926,7 @@ void TxScript::Run()
 				{
 					if (COM_Init(pRecData->iArray[0], (n >= 2)?(long)pRecData->iArray[1]:CBR_9600))
 					{
-						Result = TXSCRIPT_COMPORT_NA;
+						Result = XSCRIPT_COMPORT_NA;
 						bSuccess = FALSE;
 					}
 				}
@@ -901,48 +945,16 @@ void TxScript::Run()
 		}
 		break;
 
-		case SCRIPT_LOG:
-		{
-			char *filename = "";
-			pRecData = (SCRIPT_RECDATA*)(rec.pData);
-			int enable = 0;
-			if (rec.iLen >= 4)
-			{
-				enable = pRecData->iArray[0];					/* the Enable: 0=off, 1=on */
-				//printf("%d", enable);
-				if (rec.iLen > 4)
-				{
-					filename = &pRecData->cArray[sizeof(int)];	/* the Filename */
-					//printf(",%s", filename);
-					LOG_Term();
-					LOG_Init(filename);
-				}
-				LOG_Enable(true);
-				if (enable)
-				{
-					TRACE("> %03d: log 1\n", rec.iNum);
-				}
-				else
-				{
-					TRACE("log 0\n...\n");
-					LOG_Enable(enable);
-				}
-			}
-			else
-				TRACE("log\n");
-		}
-		break;
-
 		default:
 			printf("%s: [%d] Type Error!\n", getname(), rec.iType);
-			Result = TXSCRIPT_ERROR;
+			Result = XSCRIPT_ERROR;
 			bSuccess = FALSE;
 		}
 	}
 	if (bSuccess)
 	{
 		TRACE("%s: Success\n", getname());
-		Result = TXSCRIPT_SUCCESS;
+		Result = XSCRIPT_SUCCESS;
 	}
 	else
 	{
@@ -950,6 +962,8 @@ void TxScript::Run()
 	}
 	TMR_Stop(tmr);
 	TMR_Delete(tmr);
+	if (Result)
+		printf("Run rc=%d\n", Result);
 	e.Release();
 }
 #endif
@@ -966,41 +980,177 @@ class ATmr : CTimerFunc
 ATmr atmr;
 #endif
 
-int main()
-{
-	// Open log file to capture output from putchar and printf macros.
-	LOG_Init("C:\\winlib.txt");
+/* Local variables */
 
-	printf("winlib\n");
+SCRIPT spt;
+
+char cflag = 0;  						// compile script
+char eflag = 0;  						// execute script
+char dflag = 0;  						// dump data output
+char qflag = 0;  						// quiet mode
+char *lfile = NULL;						// debug log text output filename
+char *ifile = NULL;						// script source text input filename
+char oflag = 0;  						// save script output 
+char *ofile = NULL;						// script output filename (compiled binary format)
+
+char lfname[80];
+char ifname[80];
+char ofname[80];
+
+int main(int argc, char *argv[])
+{
+	char *p;
+	int i;
+
+	for (i = 1; --argc > 0; i++)          // parse command line options
+	{
+		p = argv[i];
+		if (*p == '-')
+		{
+			while (*++p)
+			{
+				switch (*p)
+				{
+				case 'o':
+					oflag++;
+					if (strlen(p+1))
+					{
+						ofile = p+1;
+					}
+					p = " ";
+					break;
+
+				case 'l':
+					if (strlen(p+1))
+					{
+						lfile = p+1;
+					}
+					p = " ";
+					break;
+
+				case 'i':
+					if (strlen(p + 1))
+					{
+						ifile = p + 1;
+					}
+					p = " ";
+					break;
+
+				case 'c':
+					cflag++;
+					break;
+
+				case 'e':
+					eflag++;
+					break;
+
+				case 'd':
+					dflag++;
+					break;
+
+				case 'q':
+					qflag++;
+					break;
+
+				default:
+					fprintf(stderr, "Usage: winlib [-i][file] [-o][file] [-l][file] [-c] [-e] [-d]\n");
+					fprintf(stderr, "[-i][file] source input\n");
+					fprintf(stderr, "-o[file]   binary output\n");
+					fprintf(stderr, "-l[file]   log output\n");
+					fprintf(stderr, "-c         compile script\n");
+					fprintf(stderr, "-e         execute script\n");
+					fprintf(stderr, "-d         dump data output\n");
+					fprintf(stderr, "-1         quiet mode\n");
+					exit(1);
+				}
+			}
+		}
+		else
+		{
+			ifile = p;
+		}
+	}
+	if (ifile)
+	{
+		strcpy(ifname, ifile);
+		if (!strchr(ifname, '.'))
+		{
+			strcat(ifname, (cflag)? ".spt" : ".out");
+		}
+		ifile = ifname;
+		DEBUG("ifile='%s'\n", ifile);
+	}
+	else
+		DEBUG("ifile=stdin\n");
+
+	if (cflag)
+	{
+		if (oflag)
+		{
+			if (ofile)
+			{
+				strcpy(ofname, ofile);
+				if (!strchr(ofname, '.'))
+				{
+					strcat(ofname, ".out");
+				}
+				ofile = ofname;
+				DEBUG("ofile='%s'\n", ofile);
+			}
+			else
+				DEBUG("ofile=stdout\n");
+		}
+	}
+
+	if (lfile)
+	{
+		strcpy(lfname, lfile);
+		if (!strchr(lfile, '.'))
+		{
+			strcat(lfname, ".log");
+		}
+		lfile = lfname;
+		DEBUG("lfile='%s'\n", lfile);
+	}
+	else
+		DEBUG("lfile=stdout\n");
+
+	// Open log file to capture output from putchar, puts and printf macros.
+	LOG_Init(lfile);
 
 	TMR_Init(100);	// 100ms timebase
 
-#ifdef RUN_TESTING
-	SCRIPT *sp = new SCRIPT();
-	if (sp)
+	int rc;
+
+	if (cflag)
 	{
-		int rc;
-
-		/* Load and parse the SCRIPT records from a file. */
-		printf("Load\n");
-		rc = sp->Load("c:\\temp\\test.spt");
-
-		if (rc == 0)
+		/* Load the source SCRIPT records from a file and parse. */
+		rc = spt.Load(ifile);
+	}
+	else
+	{
+		/* Load the binary SCRIPT records from a file. */
+		rc = spt.Loadbin(ifile);
+	}
+	if (rc == 0)
+	{
+		if (cflag && oflag)
 		{
-			/* Initialize the TxScript processing. */
-			TxScript *txscript = new TxScript(); // com);
+			spt.Savebin(ofile);
+		}
+		if (eflag)
+		{
+			/* Initialize the xScript thread. */
+			xScript *txscript = new xScript();
 
-			printf("Run\n");
-			rc = txscript->RunScript(sp);
+			/* Execute the script processing. */
+			rc = txscript->RunScript(&spt);
 
-			/* Terminate the TxScript thread. */
+			/* Terminate the xScript thread. */
 			delete txscript;
-
-			printf("Result=%d\n", rc);
-
-			sp->Dump();
+#if 0
 			/* Check variable 2. */
-			SCRIPT_REC *r = sp->GetVarRecPtr(6);
+			SCRIPT_REC *r = spt.GetVarRecPtr(6);
 			if (r != NULL)
 			{
 				SCRIPT_RECDATA *d = (SCRIPT_RECDATA *)r->pData;
@@ -1021,10 +1171,13 @@ int main()
 						(char)d->bArray[0], (char)d->bArray[1], (char)d->bArray[2], (char)d->bArray[3], (char)d->bArray[4]);
 				}
 			}
-		}
-		delete sp;
-	}
 #endif
+		}
+		if (dflag)
+		{
+			spt.Dump();
+		}
+	}
 
 #ifdef COM_TESTING
 	unsigned char buf[80];
@@ -1065,11 +1218,23 @@ int main()
 	COM_Term();
 	TMR_Term();
 
-	printf("exit\n\n");
-
 	// Close capture log file.
 	LOG_Term();
 	
 	return 0;
 }
+#if 0
+int main(int argc, char *argv[])
+{
+	argv[0] = "winlib";
+	argv[1] = "c:\\temp\\test.spt";
+	argv[2] = "-lc:\\temp\\test.log";
+	argv[3] = "-c";
+	argv[4] = "-o";
+	argv[5] = "-q";
+	argc = 6;
+
+	return _main(argc, argv);
+}
+#endif
 

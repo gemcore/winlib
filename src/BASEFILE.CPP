@@ -20,22 +20,31 @@
 //---------------------------------------------------------------
 BASEFILE::BASEFILE()
 {
+	v_bFileExists = FALSE;
 	hbase = INVALID_HANDLE_VALUE;
 }
 
 BASEFILE::BASEFILE(char *szBaseName)
 {
+	v_bFileExists = FALSE;
 	hbase = INVALID_HANDLE_VALUE;
-	InitFile(szBaseName);
+	if (szBaseName)
+	{
+		InitFile(szBaseName);
+	}
 }
 
 BASEFILE::BASEFILE(bool b_ReadFile, char *szBaseName)
 {
+	v_bFileExists = FALSE;
 	hbase = INVALID_HANDLE_VALUE;
-	if (b_ReadFile)
-		InitReadFile(szBaseName);
-	else
-		InitWriteFile(szBaseName);
+	if (szBaseName)
+	{
+		if (b_ReadFile)
+			InitReadFile(szBaseName);
+		else
+			InitWriteFile(szBaseName);
+	}
 }
 
 BASEFILE::~BASEFILE()
@@ -46,7 +55,7 @@ BASEFILE::~BASEFILE()
 //---------------------------------------------------------------
 
 BOOL BASEFILE::InitFile(char *szBaseName)
-{	
+{
 #ifdef _CONSOLE
 	MultiByteToWideChar(CP_ACP, 0, szBaseName, -1, v_szBaseName, sizeof(v_szBaseName));
 #else
@@ -71,24 +80,32 @@ BOOL BASEFILE::InitFile(char *szBaseName)
 
 BOOL BASEFILE::InitReadFile(char *szBaseName)
 {
+	if (szBaseName)
+	{
 #ifdef _CONSOLE
-	MultiByteToWideChar(CP_ACP, 0, szBaseName, -1, v_szBaseName, sizeof(v_szBaseName));
+		MultiByteToWideChar(CP_ACP, 0, szBaseName, -1, v_szBaseName, sizeof(v_szBaseName));
 #else
-	strncpy(v_szBaseName, szBaseName, sizeof(v_szBaseName));
+		strncpy(v_szBaseName, szBaseName, sizeof(v_szBaseName));
 #endif
-	if ((IsFile()) || (hbase != INVALID_HANDLE_VALUE))
-	{
-		CloseFile();
-	}
+		if ((IsFile()) || (hbase != INVALID_HANDLE_VALUE))
+		{
+			CloseFile();
+		}
 
-	if (INVALID_HANDLE_VALUE == (hbase = CreateFile(v_szBaseName,
-		GENERIC_READ, FILE_SHARE_READ,
-		NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)))
-	{
-		v_bFileExists = FALSE;
+		if (INVALID_HANDLE_VALUE == (hbase = CreateFile(v_szBaseName,
+			GENERIC_READ, FILE_SHARE_READ,
+			NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)))
+		{
+			v_bFileExists = FALSE;
+		}
+		else
+		{
+			v_bFileExists = TRUE;
+		}
 	}
 	else
 	{
+		hbase = GetStdHandle(STD_INPUT_HANDLE);
 		v_bFileExists = TRUE;
 	}
 	return v_bFileExists;
@@ -96,23 +113,31 @@ BOOL BASEFILE::InitReadFile(char *szBaseName)
 
 BOOL BASEFILE::InitWriteFile(char *szBaseName)
 {	
+	if (szBaseName)
+	{
 #ifdef _CONSOLE
-	MultiByteToWideChar(CP_ACP, 0, szBaseName, -1, v_szBaseName, sizeof(v_szBaseName));
+		MultiByteToWideChar(CP_ACP, 0, szBaseName, -1, v_szBaseName, sizeof(v_szBaseName));
 #else
-	strncpy(v_szBaseName, szBaseName,sizeof(v_szBaseName));
+		strncpy(v_szBaseName, szBaseName, sizeof(v_szBaseName));
 #endif
-	if ((IsFile())||(hbase != INVALID_HANDLE_VALUE)) 
-	{
-		CloseFile(); //reinit
-	}
-	if (INVALID_HANDLE_VALUE == (hbase = CreateFile(v_szBaseName,
-		GENERIC_WRITE, FILE_SHARE_READ, NULL,
-		CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0)))
-	{
-		v_bFileExists = FALSE;
+		if ((IsFile()) || (hbase != INVALID_HANDLE_VALUE))
+		{
+			CloseFile(); //reinit
+		}
+		if (INVALID_HANDLE_VALUE == (hbase = CreateFile(v_szBaseName,
+			GENERIC_WRITE, FILE_SHARE_READ, NULL,
+			CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0)))
+		{
+			v_bFileExists = FALSE;
+		}
+		else
+		{
+			v_bFileExists = TRUE;
+		}
 	}
 	else
 	{
+		hbase = GetStdHandle(STD_OUTPUT_HANDLE);
 		v_bFileExists = TRUE;
 	}
 	return v_bFileExists;
@@ -316,8 +341,12 @@ void BASEFILE::CloseFile( void )
 {
 	if (IsFile())
 	{
-		CloseHandle(hbase); 
-		hbase = INVALID_HANDLE_VALUE; 
+		if (hbase != GetStdHandle(STD_INPUT_HANDLE) &&
+			hbase != GetStdHandle(STD_OUTPUT_HANDLE))
+		{
+			CloseHandle(hbase); 
+		}
+		hbase = INVALID_HANDLE_VALUE;
 		v_bFileExists = FALSE;
 	}
 }

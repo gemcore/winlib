@@ -21,6 +21,7 @@
 #include <stdlib.h>  
 #include <crtdbg.h>  
 #include <ctype.h>
+#include "BASEFILE.HPP"
 #include "LOG.H"		// Capture putchar & printf output to a log file
 
 #undef TRACE
@@ -77,7 +78,7 @@ DataSpace::DataSpace(int size)
 DataSpace::~DataSpace()
 {
 	TRACE("~DataSpace() called, Ptr=%08x\n",Ptr);
-	//ADG! delete Space;
+	delete Space;
 }
 
 /*
@@ -94,11 +95,9 @@ void SCRIPT::Display(char *s)
 	printf("\n");
 }
 
-SCRIPT::SCRIPT(bool dump)
+SCRIPT::SCRIPT()
 {
-	dflag = dump;
-
-	TRACE("SCRIPT(%d) this=%08x\n",dump,this);
+	TRACE("SCRIPT() this=%08x\n",this);
 	Data = NULL;
 
 	for (int i = 0; i < SCRIPT_MAX_REC; i++)
@@ -110,7 +109,7 @@ SCRIPT::SCRIPT(bool dump)
 	linenum = 0;
 }
 
-SCRIPT::~SCRIPT(void)
+SCRIPT::~SCRIPT()
 {
 	TRACE("~SCRIPT() this=%08x\n",this);
 	if (Data)
@@ -119,73 +118,52 @@ SCRIPT::~SCRIPT(void)
 	}
 }
 
-int SCRIPT::Load(char *szFileName)
+int SCRIPT::FileOpen(char *filename)
 {
-	return ReadRecFile(szFileName, Rec, SCRIPT_MAX_REC);
+	if (filename)
+	{
+		return ((fp = fopen(filename, "r")) == NULL) ? 0 : 1;
+	}
+	fp = stdin;
+	return 1;
 }
 
-#include "BASEFILE.HPP"
-
-int SCRIPT::Loadbin(char *szFilename)
+void SCRIPT::FileClose(void)
 {
-	BASEFILE bf;
-	bf.InitReadFile(szFilename);
-	if (!bf.IsFile())
+	if (fp != stdout)
 	{
-		Display("Loadbin File_Not_Found!\n");
-		return -1;
+		fclose(fp);
 	}
-	bf.ReadfromFile(sizeof(int), (BYTE *)&RecCount);
-	TRACE("Loadbin RecCount=%d ", RecCount);
-	int Size = bf.Filesize() - sizeof(int) - (RecCount * sizeof(SCRIPT_REC));
-	TRACE("Size=%d\n", Size);
-	Data = DBG_NEW DataSpace(Size);
-
-	for (int i = 0; i < RecCount; i++)
-	{
-		SCRIPT_REC rec;
-		bf.ReadfromFile(sizeof(SCRIPT_REC), (BYTE *)&rec);
-		TRACE("Rec[%02d] iType=%-4d iLen=%-4d iNext=%-4d pData=%08x\n", i, Rec[i].iType, Rec[i].iLen, Rec[i].iNext, Rec[i].pData);
-		rec.pData = (void *)(Data->Space + (INT)rec.pData);
-		memcpy((BYTE *)&Rec[i], (BYTE *)&rec, sizeof(SCRIPT_REC));
-	}
-	bf.ReadfromFile(Data->Size, (BYTE *)Data->Space);
-	bf.CloseFile();
-	RecIndex = 0;
-	RecCalls = 0;
-	return 0;
 }
 
-int SCRIPT::Savebin(char *szFilename)
+int SCRIPT::Load(char *filename)
 {
-	BASEFILE bf;
-	bf.InitWriteFile(szFilename);
-	if (!bf.IsFile())
-	{
-		Display("Savebin File_Not_Found!\n");
-		return -1;
-	}
-	TRACE("Savebin RecCount=%d ", RecCount);
-	bf.WritetoFile(sizeof(int), (BYTE *)&RecCount);
-	TRACE("Size=%d\n", Data->Size);
-	for (int i = 0; i < RecCount; i++)
-	{
-		SCRIPT_REC rec;
-		memcpy((BYTE *)&rec, (BYTE *)&Rec[i], sizeof(SCRIPT_REC));
-		// Convert rec Data pointer to a offset value before writing to file.
-		rec.pData = (void *)((BYTE *)Rec[i].pData - (BYTE *)Data->Space);
-		TRACE("Rec[%02d] iType=%-4d iLen=%-4d iNext=%-4d pData=%08x\n", i, Rec[i].iType, Rec[i].iLen, Rec[i].iNext, Rec[i].pData);
-		bf.WritetoFile(sizeof(SCRIPT_REC), (BYTE *)&rec);
-	}
-	bf.WritetoFile(Data->Size, (BYTE *)Data->Space);
-	bf.CloseFile();
-	RecIndex = 0;
-	RecCalls = 0;
-	if (Data)
-	{
-		delete Data;
-	}
-	return 0;
+	int rc;
+	printf("Load '%s'\n",filename);
+	rc = ReadRecFile(filename, Rec, SCRIPT_MAX_REC);
+	if (rc)
+		printf("Load rc=%d\n",rc);
+	return rc;
+}
+
+int SCRIPT::Loadbin(char *filename)
+{
+	int rc;
+	printf("Loadbin '%s'\n",filename);
+	rc = ReadBinFile(filename);
+	if (rc)
+		printf("Loadbin rc=%d\n", rc);
+	return rc;
+}
+
+int SCRIPT::Savebin(char *filename)
+{
+	int rc;
+	printf("Savebin '%s'\n",filename);
+	rc = SaveBinFile(filename);
+	if (rc)
+		printf("Savebin rc=0\n");
+	return rc;
 }
 
 bool SCRIPT::PushReturn(void)
@@ -314,7 +292,7 @@ int  SCRIPT::FindTypeRecord(int type, int next)
 }
 
 // Read a line of text (ie. a record) from the file
-char *SCRIPT::FileGetLine()
+char *SCRIPT::FileGetLine(void)
 {
 	int i = 0;
 	char *t;
@@ -902,7 +880,12 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
         }
     }
 	RecCount = RecIndex;
-	printf("[%d] records, bytes %d used / %d remaining\n", RecCount, Data->Ptr - Data->Space, Data->Size - (Data->Ptr - Data->Space));
+	printf("[%d] records", RecCount);
+	if (Data)
+	{
+		printf(", bytes %d used / %d remaining", Data->Ptr - Data->Space, Data->Size - (Data->Ptr - Data->Space));
+	}
+	putchar('\n');
 	lasterr = 0;
 	FileClose();
 	return 0;
@@ -912,10 +895,136 @@ errmem:
 	// fall through...
 err:
 	ReadError(szInfo);
-	// fall through...
 	FileClose();
 	return lasterr;
+}
 
+int SCRIPT::ReadBinFile(char *filename)
+{
+#if 1
+	BASEFILE bf;
+	bf.InitReadFile(filename);
+	if (!bf.IsFile())
+	{
+		Display("Loadbin File_Not_Found!\n");
+		return -1;
+	}
+	bf.ReadfromFile(sizeof(int), (BYTE *)&RecCount);
+	TRACE("Loadbin RecCount=%d ", RecCount);
+#if 0
+	int Size = bf.Filesize() - sizeof(int) - (RecCount * sizeof(SCRIPT_REC));
+#else
+	int Size;
+	bf.ReadfromFile(sizeof(int), (BYTE *)&Size);
+#endif
+	TRACE("Size=%d\n", Size);
+	Data = DBG_NEW DataSpace(Size);
+	for (int i = 0; i < RecCount; i++)
+	{
+		SCRIPT_REC rec;
+		bf.ReadfromFile(sizeof(SCRIPT_REC), (BYTE *)&rec);
+		TRACE("Rec[%02d] iType=%-4d iLen=%-4d iNext=%-4d pData=%08x\n", i, Rec[i].iType, Rec[i].iLen, Rec[i].iNext, Rec[i].pData);
+		rec.pData = (void *)(Data->Space + (INT)rec.pData);
+		memcpy((BYTE *)&Rec[i], (BYTE *)&rec, sizeof(SCRIPT_REC));
+	}
+	bf.ReadfromFile(Data->Size, (BYTE *)Data->Space);
+	bf.CloseFile();
+	RecIndex = 0;
+	RecCalls = 0;
+	return 0;
+#else
+	FILE *fp = stdin;
+	if (filename)
+	{
+		if ((fp = fopen(filename, "rb")) == NULL)
+		{
+			Display("Loadbin File_Not_Found!\n");
+			return -1;
+		}
+	}
+	fread(&RecCount, sizeof(int), 1, fp);
+#if 0
+	int Size = bf.Filesize() - sizeof(int) - (RecCount * sizeof(SCRIPT_REC));
+#else
+	int Size;
+	fread(&Size, sizeof(int), 1, fp);
+#endif
+	Data = DBG_NEW DataSpace(Size);
+	for (int i = 0; i < RecCount; i++)
+	{
+		SCRIPT_REC rec; 
+		fread((BYTE *)&rec, sizeof(SCRIPT_REC), 1, fp);
+		rec.pData = (void *)(Data->Space + (INT)rec.pData);
+		memcpy((BYTE *)&Rec[i], (BYTE *)&rec, sizeof(SCRIPT_REC));
+	}
+	fread(Data->Space, sizeof(BYTE), Data->Size, fp);
+	if (filename)
+	{
+		fclose(fp);
+	}
+#endif
+	return 0;
+}
+
+int SCRIPT::SaveBinFile(char *filename)
+{
+#if 1
+	int i;
+	BASEFILE bf;
+	bf.InitWriteFile(filename);
+	if (!bf.IsFile())
+	{
+		Display("Savebin File_Not_Found!\n");
+		return -1;
+	}
+	TRACE("Savebin RecCount=%d ", RecCount);
+	bf.WritetoFile(sizeof(int), (BYTE *)&RecCount);
+	TRACE("Size=%d\n", Data->Size);
+#if 1
+	bf.WritetoFile(sizeof(int), (BYTE *)&Data->Size);
+#endif
+	for (i = 0; i < RecCount; i++)
+	{
+		SCRIPT_REC rec;
+		memcpy((BYTE *)&rec, (BYTE *)&Rec[i], sizeof(SCRIPT_REC));
+		// Convert rec Data pointer to a offset value before writing to file.
+		rec.pData = (void *)((BYTE *)Rec[i].pData - (BYTE *)Data->Space);
+		TRACE("Rec[%02d] iType=%-4d iLen=%-4d iNext=%-4d pData=%08x\n", i, Rec[i].iType, Rec[i].iLen, Rec[i].iNext, Rec[i].pData);
+		bf.WritetoFile(sizeof(SCRIPT_REC), (BYTE *)&rec);
+	}
+	bf.WritetoFile(Data->Size, (BYTE *)Data->Space);
+	bf.CloseFile();
+#else
+	FILE *fp = stdout;
+	if (filename)
+	{
+		if ((fp = fopen(filename, "wb")) == NULL)
+		{
+			Display("Savebin File_Not_Found!\n");
+			return -1;
+		}
+	}
+	fwrite(&RecCount, sizeof(int), 1, fp);
+#if 1
+	fwrite(&Data->Size, sizeof(int), 1, fp);
+#endif
+	for (int i=0; i < RecCount; i++)
+	{
+		SCRIPT_REC rec;
+		memcpy((BYTE *)&rec, (BYTE *)&Rec[i], sizeof(SCRIPT_REC));
+		// Convert rec Data pointer to a offset value before writing to file.
+		rec.pData = (void *)((BYTE *)Rec[i].pData - (BYTE *)Data->Space);
+		fwrite((BYTE *)&rec, sizeof(SCRIPT_REC), 1, fp);
+	}
+	fwrite(Data->Space, sizeof(char), Data->Size, fp);
+	if (filename)
+	{
+		fclose(fp);
+	}
+#endif
+	RecIndex = 0;
+	RecCalls = 0;
+	return 0;
 }
 
 /*****************************************************************************
@@ -980,7 +1089,8 @@ char *bytestoa(unsigned char *bytes, char *s, int n)
 
 void SCRIPT::Dump(void)
 {
-	if (dflag && Data != NULL)
+	printf("Dump\n");
+	if (Data != NULL)
 	{
 		MEM_Dump((unsigned char *)Data->Space, Data->Size, 0L);
 	}
@@ -997,7 +1107,7 @@ void MEM_Dump(unsigned char *data, int len, long base)
 	int i, j;
 
 	//printf("MEM: @%08x len=%04x\n",data,len);
-	for (i = 0; i < len; i += 16)
+ 	for (i = 0; i < len; i += 16)
 	{
 		printf(" %06x: ", base + i);
 		for (j = 0; j < 16; j++)

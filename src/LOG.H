@@ -39,7 +39,9 @@
 #define putchar(c)	      do{ if (log) log->PutChar(c); }while(0)
 #define puts(s)		      do{ if (log) log->PutStr(s); }while(0)
 #define printf(fmt, ...)  do{ if (log) log->Printf(fmt, __VA_ARGS__); }while(0)
-#define TRACE(fmt, ...)   do{ if (log) log->Printf(fmt, __VA_ARGS__); }while(0)
+
+#define TRACE(fmt, ...)   do{ if (!qflag) fprintf(stderr, fmt, __VA_ARGS__); }while(0)
+#define DEBUG(fmt, ...)   do{ if (!qflag) fprintf(stderr, fmt, __VA_ARGS__); }while(0)
 
 /*==========================================================================
 |
@@ -52,8 +54,8 @@ class LOG : BASEFILE
    bool bflag;
 
 public:
-	LOG(char *filename, bool flag=true);
-   ~LOG();
+	LOG(char *filename);
+	~LOG() { Flush(); }
    
    void Flush(void);
    void PutChar(int c);
@@ -62,6 +64,7 @@ public:
    void Enable(bool flag) { bflag = flag; }
 };
 
+extern char qflag;
 extern LOG *log;
 
 extern "C"
