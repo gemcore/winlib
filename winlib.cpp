@@ -23,6 +23,7 @@
 #undef DEBUG
 #define DEBUG(...)
 
+#define CLI_TESTING
 #define RUN_TESTING
 //#define COM_TESTING
 //#define TMR_TESTING
@@ -113,19 +114,20 @@ extern "C"
 /* xScript return result codes. */
 #define XSCRIPT_PROCESSING       1
 #define XSCRIPT_SUCCESS          0
-#define XSCRIPT_EXIT			 -1
+#define XSCRIPT_EXIT			-1
 #define XSCRIPT_FILE_NOT_FOUND  -2
-#define XSCRIPT_ERROR           -3
-#define XSCRIPT_COMPORT_NA      -4
-#define XSCRIPT_TIMEOUT         -5
-#define XSCRIPT_LABEL_NOT_FOUND -6
-#define XSCRIPT_VAR_NOT_FOUND   -7
-#define XSCRIPT_BUF_NOT_FOUND   -8
-#define XSCRIPT_VAL_UNDEFINED   -9
-#define XSCRIPT_RET_UNDEFINED  -10
-#define XSCRIPT_CALL_OVERFLOW  -11
-#define XSCRIPT_ABORTED        -12
-#define XSCRIPT_OTHER          -13
+#define XSCRIPT_TXFILE_TYPE     -3
+#define XSCRIPT_ERROR           -4
+#define XSCRIPT_COMPORT_NA      -5
+#define XSCRIPT_TIMEOUT         -6
+#define XSCRIPT_LABEL_NOT_FOUND -7
+#define XSCRIPT_VAR_NOT_FOUND   -8
+#define XSCRIPT_BUF_NOT_FOUND   -9
+#define XSCRIPT_VAL_UNDEFINED  -10
+#define XSCRIPT_RET_UNDEFINED  -11
+#define XSCRIPT_CALL_OVERFLOW  -12
+#define XSCRIPT_ABORTED        -13
+#define XSCRIPT_OTHER          -14
 
 class xScript : public ActiveObject
 {
@@ -233,7 +235,6 @@ void xScript::Run()
 		{
 		case SCRIPT_CALL:
 		{
-			int c;
 			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 			printf("call %d ", rec.iNext);
 			int i;
@@ -264,7 +265,6 @@ void xScript::Run()
 
 		case SCRIPT_RET:
 		{
-			int i;
 			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 			printf("ret ");
 			/* Pop the return record location. */
@@ -997,7 +997,11 @@ char lfname[80];
 char ifname[80];
 char ofname[80];
 
+#ifdef CLI_TESTING
+int _main(int argc, char *argv[])
+#else
 int main(int argc, char *argv[])
+#endif
 {
 	char *p;
 	int i;
@@ -1060,7 +1064,7 @@ int main(int argc, char *argv[])
 					fprintf(stderr, "-c         compile script\n");
 					fprintf(stderr, "-e         execute script\n");
 					fprintf(stderr, "-d         dump data output\n");
-					fprintf(stderr, "-1         quiet mode\n");
+					fprintf(stderr, "-q         quiet mode\n");
 					exit(1);
 				}
 			}
@@ -1148,7 +1152,7 @@ int main(int argc, char *argv[])
 
 			/* Terminate the xScript thread. */
 			delete txscript;
-#if 0
+#if 1
 			/* Check variable 2. */
 			SCRIPT_REC *r = spt.GetVarRecPtr(6);
 			if (r != NULL)
@@ -1223,16 +1227,17 @@ int main(int argc, char *argv[])
 	
 	return 0;
 }
-#if 0
+#ifdef CLI_TESTING
 int main(int argc, char *argv[])
 {
 	argv[0] = "winlib";
 	argv[1] = "c:\\temp\\test.spt";
 	argv[2] = "-lc:\\temp\\test.log";
 	argv[3] = "-c";
-	argv[4] = "-o";
-	argv[5] = "-q";
-	argc = 6;
+	argv[4] = "-oc:\\temp\\test.out";
+	argv[5] = "-e";
+	argv[6] = "-d";
+	argc = 7;
 
 	return _main(argc, argv);
 }
