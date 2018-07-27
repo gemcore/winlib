@@ -345,7 +345,7 @@ void xScript::Run()
 				for (Cnt = 0; Cnt < MaxCnt; Cnt++)
 				{
 					int c;
-					if (pScript->GetRec(j)->bFmt == 0)
+					if (pScript->GetRec(j)->bFmt == FMT_VAR_INT)
 					{
 						// Get int from int array.
 						pScript->GetVar(j, (int *)&c, idx + Cnt);
@@ -585,7 +585,7 @@ void xScript::Run()
 					if (var != -1)
 					{
 						// Save char to var or buf array.
-						if (pScript->GetRec(j)->bFmt == 0)
+						if (pScript->GetRec(j)->bFmt == FMT_VAR_INT)
 						{
 							pScript->SetVar(j, c, idx + Cnt);
 						}
@@ -655,7 +655,7 @@ void xScript::Run()
 
 		case SCRIPT_VAR:
 		{
-			if (rec.bFmt == 0)
+			if (rec.bFmt == FMT_VAR_INT)
 			{
 				printf("var %d:", rec.iNext);
 				int i;

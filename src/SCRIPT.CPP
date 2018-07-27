@@ -558,7 +558,7 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 				}
 			}
 
-			Rec[RecIndex].bFmt = 0;
+			Rec[RecIndex].bFmt = FMT_VAR_INT;
 			Rec[RecIndex].iNext = 0;
 
 			if (!strcmp(tp, sg[SCRIPT_SERIAL].szKey))
@@ -852,19 +852,22 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 					if ((tp = strtok(NULL, tokval)) != NULL)
 					{
 						if (!ScanVar(&cnt, &pDest)) goto errmem;
-						char cond = GetExpr();
-						if (cond != -1)
+						if ((tp = strtok(NULL, tokval)) != NULL)
 						{
-							Rec[RecIndex].bFmt = cond;
-						}
-						else
-						{
-							Rec[RecIndex].bFmt = FMT_EXPR_NOT_EQ;	// default condition "!="
-							if (!ScanInt(&cnt, &pDest)) goto errmem;
-						}
-						while ((tp = strtok(NULL, tokval)) != NULL)
-						{
-							if (!ScanInt(&cnt, &pDest)) goto errmem;
+							char cond = GetExpr();
+							if (cond != -1)
+							{
+								Rec[RecIndex].bFmt = cond;
+							}
+							else
+							{
+								Rec[RecIndex].bFmt = FMT_EXPR_NOT_EQ;	// default condition "!="
+								if (!ScanInt(&cnt, &pDest)) goto errmem;
+							}
+							while ((tp = strtok(NULL, tokval)) != NULL)
+							{
+								if (!ScanInt(&cnt, &pDest)) goto errmem;
+							}
 						}
 					}
 				}
