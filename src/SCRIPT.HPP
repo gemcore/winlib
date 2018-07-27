@@ -51,6 +51,27 @@ enum SCRIPT_TYPE
 	SCRIPT_LABEL,			// 15 label
 };
 
+// Eg. 'var'  type 0=int, 1=byte[]
+
+enum FMT_VAR_TYPE
+{
+	FMT_VAR_INT = 0,
+	FMT_VAR_BYTE
+};
+
+// Eg. 'goto' default expression is "val1 >= val2"
+// Eg. 'test' default expression is "val1 != val2"
+
+enum FMT_EXPR
+{
+	FMT_EXPR_EQ	= 0,	// "=="
+	FMT_EXPR_NOT_EQ,	// "!="
+	FMT_EXPR_GR_OR_EQ,	// ">="
+	FMT_EXPR_LS_OR_EQ,	// "<="
+	FMT_EXPR_GR,		// ">"
+	FMT_EXPR_LS			// "<"
+};
+
 typedef struct
 {
 	char *szKey;			// key word
@@ -59,7 +80,7 @@ typedef struct
 typedef struct
 {   
    SCRIPT_TYPE iType;		// type
-   char bFmt[2];			// data format info (eg. for 'var' type 0=int, 1=byte)
+   char bFmt;				// data format info
    int iNum;				// line number (only needed for reporting)
    int iLen;				// length of record data
    int iNext;				// next record if > 0
@@ -113,6 +134,7 @@ private:
 	void ReadError(char *s);
 	void Display(char *s);
 	bool AllocData(int *cnt, int size);
+	char GetExpr(void);
 	bool ScanChar(int *cnt, char **pp);
 	bool ScanInt(int *cnt, char **pp);
 	bool ScanVar(int *cnt, char **pp);
@@ -144,6 +166,8 @@ public:
 	SCRIPT_REC *GetVarRecPtr(int iNum);
 	bool PushReturn(void);
 	bool PopReturn(int i=0);
+	bool EvalExpr(char expr, int var, int val);
+	bool EvalExpr(char expr, byte var, byte val);
 };
 
 #endif //#ifndef _SCRIPT_HPP 

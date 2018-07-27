@@ -19,10 +19,11 @@
 #endif
 
 #undef TRACE
-#define TRACE(...)
+#define TRACE(fmt,...)	printf(fmt,__VA_ARGS__)
 #undef DEBUG
 #define DEBUG(...)
 
+#define CLI_TESTING
 #define RUN_TESTING
 //#define COM_TESTING
 //#define TMR_TESTING
@@ -113,7 +114,7 @@ extern "C"
 /* xScript return result codes. */
 #define XSCRIPT_PROCESSING       1
 #define XSCRIPT_SUCCESS          0
-#define XSCRIPT_EXIT			 -1
+#define XSCRIPT_EXIT            -1
 #define XSCRIPT_FILE_NOT_FOUND  -2
 #define XSCRIPT_ERROR           -3
 #define XSCRIPT_COMPORT_NA      -4
@@ -195,10 +196,11 @@ void xScript::Run()
 			break;
 		}
 
+		pRecData = (SCRIPT_RECDATA*)(rec.pData);
+
 		if (rec.iType == SCRIPT_LOG)
 		{
 			char *filename = "";
-			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 			int enable = 0;
 			if (rec.iLen >= 4)
 			{
@@ -234,7 +236,6 @@ void xScript::Run()
 		case SCRIPT_CALL:
 		{
 			int c;
-			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 			printf("call %d ", rec.iNext);
 			int i;
 			// call label record specified 
@@ -265,7 +266,6 @@ void xScript::Run()
 		case SCRIPT_RET:
 		{
 			int i;
-			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 			printf("ret ");
 			/* Pop the return record location. */
 			if (!pScript->PopReturn())
@@ -283,7 +283,6 @@ void xScript::Run()
 		case SCRIPT_TXCHAR:
 		{
 			int c;
-			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 			printf("tx %d ", rec.iLen);
 			for (int i = 0; i < rec.iLen; i++)
 			{
@@ -304,7 +303,6 @@ void xScript::Run()
 
 		case SCRIPT_TXBUF:
 		{
-			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 			printf("txbuf");
 			for (int k=0; k < rec.iNext; k++)
 			{
@@ -347,7 +345,7 @@ void xScript::Run()
 				for (Cnt = 0; Cnt < MaxCnt; Cnt++)
 				{
 					int c;
-					if (pScript->GetRec(j)->bFmt[0] == 0)
+					if (pScript->GetRec(j)->bFmt == 0)
 					{
 						// Get int from int array.
 						pScript->GetVar(j, (int *)&c, idx + Cnt);
@@ -380,7 +378,6 @@ void xScript::Run()
 			long size;
 			BYTE buf[BUFSIZE];
 			int buflen;
-			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 			filename = pRecData->cArray;	/* the image filename */
 			bool bDone = false;
 			printf("txfile %s ", filename);
@@ -422,7 +419,6 @@ void xScript::Run()
 
 		case SCRIPT_RXCHAR:
 		{
-			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 			TMR_Stop(tmr);
 			if (Timeout > 0)
 			{
@@ -507,7 +503,6 @@ void xScript::Run()
 
 		case SCRIPT_SKIP:
 		{
-			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 			TMR_Stop(tmr);
 			if (Timeout > 0)
 			{
@@ -590,7 +585,7 @@ void xScript::Run()
 					if (var != -1)
 					{
 						// Save char to var or buf array.
-						if (pScript->GetRec(j)->bFmt[0] == 0)
+						if (pScript->GetRec(j)->bFmt == 0)
 						{
 							pScript->SetVar(j, c, idx + Cnt);
 						}
@@ -614,7 +609,6 @@ void xScript::Run()
 
 		case SCRIPT_DELAY:
 		{
-			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 			printf("delay %d", pRecData->iValue);
 			int i;
 			for (i = 0; i < pRecData->iValue; i++)
@@ -634,7 +628,6 @@ void xScript::Run()
 
 		case SCRIPT_TIMEOUT:
 		{
-			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 			Timeout = pRecData->iValue;
 			printf("timeout %d\n", Timeout);
 			TMR_Stop(tmr);
@@ -647,7 +640,6 @@ void xScript::Run()
 
 		case SCRIPT_EXIT:
 		{
-			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 			if (rec.iLen == 0)
 			{
 				Result = XSCRIPT_EXIT;
@@ -663,8 +655,7 @@ void xScript::Run()
 
 		case SCRIPT_VAR:
 		{
-			pRecData = (SCRIPT_RECDATA*)(rec.pData);
-			if (rec.bFmt[0] == 0)
+			if (rec.bFmt == 0)
 			{
 				printf("var %d:", rec.iNext);
 				int i;
@@ -695,7 +686,6 @@ void xScript::Run()
 
 		case SCRIPT_BUF:
 		{
-			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 			printf("buf %d:", rec.iNext);
 			int i;
 			int n = rec.iLen / sizeof(byte);
@@ -713,7 +703,6 @@ void xScript::Run()
 
 		case SCRIPT_GOTO:
 		{
-			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 			printf("goto %d", rec.iNext);
 			int i;
 			int n = rec.iLen / sizeof(int);
@@ -754,18 +743,16 @@ void xScript::Run()
 								inc = pRecData->iArray[2];
 							}
 						}
-						TRACE(" %d@%d=", var, idx);
-						if (pScript->GetRec(j)->bFmt[0] == 0)
+						if (pScript->GetRec(j)->bFmt == FMT_VAR_INT)
 						{
 							pScript->GetVar(j, &var, idx);
-							TRACE("(%d", var);
-							if (var >= val)
+							if (pScript->EvalExpr(rec.bFmt, var, val))
 							{
-								TRACE(">=%d) continue", val);
+								TRACE("continue");
 							}
 							else
 							{
-								TRACE("< %d) inc=%d, new val=%d", val, inc, var + inc);
+								TRACE("val+%d=%d", inc, var + inc);
 								pScript->SetVar(j, var + inc, idx);
 								TRACE("\njump to record %d", i);
 								pScript->SetRecord(i);		// Goto to record
@@ -775,14 +762,13 @@ void xScript::Run()
 						{
 							pScript->GetVar(j, (byte *)&var, idx);
 							var &= 0xFF;
-							TRACE("(%d", var);
-							if (var >= val)
+							if (pScript->EvalExpr(rec.bFmt, (byte)var, (byte)val))
 							{
-								TRACE(">=%d) continue", val);
+								TRACE("continue");
 							}
 							else
 							{
-								TRACE("< %d) inc=%d, new val=%d", val, inc, var + inc);
+								TRACE("val+%d=%d", (byte)inc, (byte)(var + inc));
 								pScript->SetVar(j, (byte)(var + inc), idx);
 								TRACE("\njump to record %d", i);
 								pScript->SetRecord(i);		// Goto to record
@@ -853,24 +839,21 @@ void xScript::Run()
 							inc = pRecData->iArray[2];
 						}
 					}
-					TRACE(" %d@%d=", var, idx);
-					if (pScript->GetRec(j)->bFmt[0] == 0)
+					if (pScript->GetRec(j)->bFmt == FMT_VAR_INT)
 					{
 						pScript->GetVar(j, &var, idx);
-						TRACE("(%d", var);
-						if (var == val)
+						if (pScript->EvalExpr(rec.bFmt, var, val))
 						{
-							TRACE("==%d) continue", val);
+							TRACE("continue");
 						}
 						else
 						{
-							TRACE("!=%d), ", val);
 							if (rec.iLen >= 12)
 							{
-								TRACE("new val=%d, ", inc);
+								TRACE("val=%d", inc);
 								pScript->SetVar(j, inc, idx);
 							}
-							TRACE("skip %d records", rec.iNext);
+							TRACE("\nskip %d records", rec.iNext);
 							pScript->SetRecord(pScript->GetRecord() + rec.iNext);	// Skip over records
 						}
 					}
@@ -878,20 +861,18 @@ void xScript::Run()
 					{
 						pScript->GetVar(j, (byte *)&var, idx);
 						var &= 0xFF;
-						TRACE("(%d", var);
-						if (var == val)
+						if (pScript->EvalExpr(rec.bFmt, (byte)var, (byte)val))
 						{
-							TRACE("==%d) continue", val);
+							TRACE("continue");
 						}
 						else
 						{
-							TRACE("!=%d), ", val);
 							if (rec.iLen >= 12)
 							{
-								TRACE("new val=%d, ", inc);
+								TRACE("val=%d", inc);
 								pScript->SetVar(j, (byte)inc, idx);
 							}
-							TRACE("skip %d records", rec.iNext);
+							TRACE("\nskip %d records", rec.iNext);
 							pScript->SetRecord(pScript->GetRecord() + rec.iNext);	// Skip over records
 						}
 					}
@@ -910,7 +891,6 @@ void xScript::Run()
 
 		case SCRIPT_SERIAL:
 		{
-			pRecData = (SCRIPT_RECDATA*)(rec.pData);
 			printf("serial %d", rec.iNext);
 			int i;
 			int n = rec.iLen / sizeof(int);
@@ -941,7 +921,9 @@ void xScript::Run()
 
 		case SCRIPT_LABEL:
 		{
-			printf("%d:\n", rec.iNext);
+			printf("%d:", rec.iNext);
+			//TRACE(" record %d", pScript->GetRecord() - 1);
+			printf("\n");
 		}
 		break;
 
@@ -997,7 +979,7 @@ char lfname[80];
 char ifname[80];
 char ofname[80];
 
-int main(int argc, char *argv[])
+int _main(int argc, char *argv[])
 {
 	char *p;
 	int i;
@@ -1060,7 +1042,7 @@ int main(int argc, char *argv[])
 					fprintf(stderr, "-c         compile script\n");
 					fprintf(stderr, "-e         execute script\n");
 					fprintf(stderr, "-d         dump data output\n");
-					fprintf(stderr, "-1         quiet mode\n");
+					fprintf(stderr, "-q         quiet mode\n");
 					exit(1);
 				}
 			}
@@ -1223,15 +1205,19 @@ int main(int argc, char *argv[])
 	
 	return 0;
 }
-#if 0
+
+#ifdef CLI_TESTING
 int main(int argc, char *argv[])
 {
 	argv[0] = "winlib";
-	argv[1] = "c:\\temp\\test.spt";
-	argv[2] = "-lc:\\temp\\test.log";
+	argv[1] = "c:\\temp\\test3.spt";
+	argv[2] = "-lc:\\temp\\test3.log";
 	argv[3] = "-c";
-	argv[4] = "-o";
-	argv[5] = "-q";
+	argv[4] = "-e";
+	argv[5] = "-d";
+	//argv[6] = "-o";
+	//argv[7] = "-q";
+	//argc = 8;
 	argc = 6;
 
 	return _main(argc, argv);
