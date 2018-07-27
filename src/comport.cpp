@@ -104,7 +104,7 @@ bool ComPort::Start()
    MultiByteToWideChar(CP_ACP, 0, szPort, -1, swPort, sizeof(swPort));
 #else
    //strncpy(swPort, szPort, sizeof(swPort));
-   wsprintf(swPort, _T("\\\\.\\COM%d"), bPort);
+   wsprintf( swPort, _T("\\\\.\\COM%d"), bPort );     
 #endif
    if (fConnected)
    {

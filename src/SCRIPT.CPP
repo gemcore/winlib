@@ -24,9 +24,6 @@
 #include "BASEFILE.HPP"
 #include "LOG.H"		// Capture putchar & printf output to a log file
 
-#undef TRACE
-#define TRACE(fmt, ...)
-
 #ifdef _DEBUG
 #define DBG_NEW new ( _NORMAL_BLOCK , __FILE__ , __LINE__ )
 // Replace _NORMAL_BLOCK with _CLIENT_BLOCK if you want the
@@ -34,6 +31,12 @@
 #else
 #define DBG_NEW new
 #endif
+
+#undef TRACE
+#define TRACE(fmt,...)	printf(fmt,__VA_ARGS__)
+#undef DEBUG
+#define DEBUG(...)
+
 #include "script.hpp"
 
 unsigned char *atobytes(char *s, unsigned char *bytes, int n);
@@ -261,8 +264,7 @@ int  SCRIPT::GetNextRec(SCRIPT_REC *pRec)
 		if ( RecIndex < RecCount )
 		{
 			pRec->iType = Rec[RecIndex].iType;
-			pRec->bFmt[0] = Rec[RecIndex].bFmt[0];
-			pRec->bFmt[1] = Rec[RecIndex].bFmt[1];
+			pRec->bFmt  = Rec[RecIndex].bFmt;
 			pRec->iNum  = Rec[RecIndex].iNum;
 			pRec->iLen  = Rec[RecIndex].iLen;
 			pRec->pData = Rec[RecIndex].pData;
@@ -353,6 +355,39 @@ bool SCRIPT::AllocData(int *cnt, int size)
 	lasterr = -9;	/* ERR: Out of Data space!*/
 	return 1;
 }
+
+char SCRIPT::GetExpr(void)
+{
+	if (!strcmp(tp, "=="))
+	{
+		return FMT_EXPR_EQ;
+	}
+	else if (!strcmp(tp, "!="))
+	{
+		return FMT_EXPR_NOT_EQ;
+	}
+	else if (!strcmp(tp, ">="))
+	{
+		return FMT_EXPR_GR_OR_EQ;
+	}
+	else if (!strcmp(tp, "<="))
+	{
+		return FMT_EXPR_LS_OR_EQ;
+	}
+	else if (!strcmp(tp, ">"))
+	{
+		return FMT_EXPR_GR;
+	}
+	else if (!strcmp(tp, "<"))
+	{
+		return FMT_EXPR_LS;
+	}
+	else
+	{
+		return -1;
+	}
+}
+
 bool SCRIPT::ScanChar(int *cnt, char **pp)
 {
 	if (AllocData(cnt,sizeof(char))) return false;
@@ -523,8 +558,7 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 				}
 			}
 
-			Rec[RecIndex].bFmt[0] = 0;
-			Rec[RecIndex].bFmt[1] = 0;
+			Rec[RecIndex].bFmt = 0;
 			Rec[RecIndex].iNext = 0;
 
 			if (!strcmp(tp, sg[SCRIPT_SERIAL].szKey))
@@ -772,22 +806,36 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 						if (!ScanInt(&cnt, &pDest)) goto errmem;
 					}
 				}
-				Rec[RecIndex].bFmt[0] = 0;
+				Rec[RecIndex].bFmt = FMT_VAR_INT;
 				Rec[RecIndex].iType = SCRIPT_VAR;
 				Rec[RecIndex].iNext = var;
 			}
 			else  if (!strcmp(tp, sg[SCRIPT_GOTO].szKey))
 			{
 				int label = 0;
+				Rec[RecIndex].bFmt = -1;
 				if ((tp = strtok(NULL, toksep)) != NULL)
 				{
 					sscanf(tp, "%d", &label);
 					if ((tp = strtok(NULL, tokval)) != NULL)
 					{
 						if (!ScanVar(&cnt, &pDest)) goto errmem;
-						while ((tp = strtok(NULL, tokval)) != NULL)
+						if ((tp = strtok(NULL, tokval)) != NULL)
 						{
-							if (!ScanInt(&cnt, &pDest)) goto errmem;
+							char cond = GetExpr();
+							if (cond != -1)
+							{
+								Rec[RecIndex].bFmt = cond;
+							}
+							else
+							{	
+								Rec[RecIndex].bFmt = FMT_EXPR_NOT_EQ;	// default condition "!="
+								if (!ScanInt(&cnt, &pDest)) goto errmem;
+							}
+							while ((tp = strtok(NULL, tokval)) != NULL)
+							{
+								if (!ScanInt(&cnt, &pDest)) goto errmem;
+							}
 						}
 					}
 				}
@@ -797,12 +845,23 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 			else  if (!strcmp(tp, sg[SCRIPT_TEST].szKey))
 			{
 				int label = 0;
+				Rec[RecIndex].bFmt = -1;
 				if ((tp = strtok(NULL, toksep)) != NULL)
 				{
 					sscanf(tp, "%d", &label);
 					if ((tp = strtok(NULL, tokval)) != NULL)
 					{
 						if (!ScanVar(&cnt, &pDest)) goto errmem;
+						char cond = GetExpr();
+						if (cond != -1)
+						{
+							Rec[RecIndex].bFmt = cond;
+						}
+						else
+						{
+							Rec[RecIndex].bFmt = FMT_EXPR_NOT_EQ;	// default condition "!="
+							if (!ScanInt(&cnt, &pDest)) goto errmem;
+						}
 						while ((tp = strtok(NULL, tokval)) != NULL)
 						{
 							if (!ScanInt(&cnt, &pDest)) goto errmem;
@@ -834,7 +893,6 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 							tp = p;
 							int k = 0;
 							if (!ScanStr(&k, &pDest)) goto errmem;
-							TRACE("cnt=%d j=%d k=%d\n", cnt, j, k);
 							if (AllocData(&cnt, max(j, k))) goto errmem;
 							if (j > k)
 							{
@@ -848,7 +906,7 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 						if (!ScanStr(&cnt, &pDest)) goto errmem;
 					}
 				}
-				Rec[RecIndex].bFmt[0] = 1;
+				Rec[RecIndex].bFmt = FMT_VAR_BYTE;
 				Rec[RecIndex].iType = SCRIPT_VAR;
 				Rec[RecIndex].iNext = buf;
 			}
@@ -897,6 +955,116 @@ err:
 	ReadError(szInfo);
 	FileClose();
 	return lasterr;
+}
+
+bool SCRIPT::EvalExpr(char expr, int var, int val)
+{
+	bool rc = false;
+	TRACE(" %d ", var);
+	switch (expr)
+	{
+	case FMT_EXPR_EQ:
+		TRACE("==");
+		if (var == val)
+		{
+			rc = true;
+		}
+		break;
+	case FMT_EXPR_NOT_EQ:
+		TRACE("!=");
+		if (var != val)
+		{
+			rc = true;
+		}
+		break;
+	case FMT_EXPR_GR_OR_EQ:
+		TRACE(">=");
+		if (var >= val)
+		{
+			rc = true;
+		}
+		break;
+	case FMT_EXPR_LS_OR_EQ:
+		TRACE("<=");
+		if (var <= val)
+		{
+			rc = true;
+		}
+		break;
+	case FMT_EXPR_GR:
+		TRACE(">");
+		if (var > val)
+		{
+			rc = true;
+		}
+		break;
+	case FMT_EXPR_LS:
+		TRACE("<");
+		if (var < val)
+		{
+			rc = true;
+		}
+		break;
+	default:
+		TRACE("??");
+	}
+	TRACE(" %d, ", val);
+	return rc;
+}
+
+bool SCRIPT::EvalExpr(char expr, byte var, byte val)
+{
+	bool rc = false;
+	TRACE(" %d ", var);
+	switch (expr)
+	{
+	case FMT_EXPR_EQ:
+		TRACE("==");
+		if (var == val)
+		{
+			rc = true;
+		}
+		break;
+	case FMT_EXPR_NOT_EQ:
+		TRACE("!=");
+		if (var != val)
+		{
+			rc = true;
+		}
+		break;
+	case FMT_EXPR_GR_OR_EQ:
+		TRACE(">=");
+		if (var >= val)
+		{
+			rc = true;
+		}
+		break;
+	case FMT_EXPR_LS_OR_EQ:
+		TRACE("<=");
+		if (var <= val)
+		{
+			rc = true;
+		}
+		break;
+	case FMT_EXPR_GR:
+		TRACE(">");
+		if (var > val)
+		{
+			rc = true;
+		}
+		break;
+	case FMT_EXPR_LS:
+		TRACE("<");
+		if (var < val)
+		{
+			rc = true;
+		}
+		break;
+	default:
+		TRACE("??");
+	}
+	TRACE(" %d, ", val);
+	return rc;
 }
 
 int SCRIPT::ReadBinFile(char *filename)
