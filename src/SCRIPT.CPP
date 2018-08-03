@@ -61,7 +61,8 @@ SCRIPT_GRAMMER sg[]=
 	"buf",		// SCRIPT_BUF
 	"call",		// SCRIPT_CALL
 	"ret",		// SCRIPT_RET
-	"log"		// SCRIPT_LOG
+	"log",		// SCRIPT_LOG
+	"echo"      // SCRIPT_ECHO
 };
 
 char *toksep = " :,\t\n";
@@ -912,6 +913,53 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 				Rec[RecIndex].bFmt = FMT_VAR_BYTE;
 				Rec[RecIndex].iType = SCRIPT_VAR;
 				Rec[RecIndex].iNext = buf;
+			}
+			else  if (!strcmp(tp, sg[SCRIPT_ECHO].szKey))
+			{
+				if ((tp = strtok(NULL, tokeol)) != NULL)
+				{
+					char *pSrc = tp;
+					while (*pSrc)
+					{
+						if (*pSrc != '\\')
+						{
+							cnt += 1;
+							if (!IsDataSpace(cnt)) goto errmem;
+							*pDest++ = *pSrc++;
+						}
+						else
+						{
+							pSrc++;
+							if (*pSrc != 'x' && *pSrc != 'X')
+							{
+								sprintf(szInfo, "Wrong Esc character %s", tp);
+								lasterr = -2;
+								goto err;
+							}
+							else
+							{
+								pSrc++;
+
+								char szByte[3];
+								szByte[0] = *pSrc++;   // high nibble
+								szByte[1] = *pSrc++;   // low nibble
+								szByte[2] = 0;
+
+								if (!isxdigit(szByte[0]) || !isxdigit(szByte[1]))
+								{
+									sprintf((char *)szInfo, "Invalid hex digit %s", tp);
+									lasterr = -3;
+									goto err;
+								}
+								if (AllocData(&cnt, sizeof(char))) goto errmem;
+								sscanf(szByte, "%02X", pDest);
+								pDest++;
+							}
+						}
+					}
+					*pDest = 0;
+				}
+				Rec[RecIndex].iType = SCRIPT_ECHO;
 			}
 			else  if (isdigit(*tp))
 			{

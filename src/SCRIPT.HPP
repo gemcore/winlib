@@ -46,6 +46,7 @@ enum SCRIPT_TYPE
 	SCRIPT_CALL,			// 14 call
 	SCRIPT_RET, 			// 15 ret
 	SCRIPT_LOG, 			// 16 log
+	SCRIPT_ECHO,            // 17 echo
 
 	/* Special tokens. */
 	SCRIPT_LABEL,			// 15 label

@@ -927,6 +927,29 @@ void xScript::Run()
 		}
 		break;
 
+		case SCRIPT_ECHO:
+		{
+            printf("echo %d ", rec.iLen);
+		    for (int i = 0; i < rec.iLen; i++)
+		    {
+			    int c;
+			    c = pRecData->cArray[i] & 0xFF;
+			    if (isprint(c))
+			    {
+				    //CON_putc(c);
+					putchar(c);
+			    }
+			    else
+			    {
+				    //CON_printf("\\x%02X", c);
+					printf("\\x%02X", c);
+				}
+		    }
+		    //CON_putc('\n');
+			putchar('\n');
+		}
+		break;
+
 		default:
 			printf("%s: [%d] Type Error!\n", getname(), rec.iType);
 			Result = XSCRIPT_ERROR;
