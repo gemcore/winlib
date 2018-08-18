@@ -23,11 +23,13 @@
 #undef DEBUG
 #define DEBUG(...)
 
-#define CLI_TESTING
-#define RUN_TESTING
+//#define RUN_TESTING
 //#define COM_TESTING
 //#define TMR_TESTING
-//#define MDM_TESTING
+#define MDM_TESTING
+
+/* xScript Rx initial timeout maximum value. */
+#define TMR_TIMEOUT_MAX	32000
 
 ComPort *com = NULL;
 
@@ -36,8 +38,6 @@ int rxpacket_cnt = 0;
 byte rxpacket[80];
 
 extern void MEM_Dump(unsigned char *data, int len, long base);
-extern int xmodemReceive(unsigned char *dest, int destsz);
-extern int xmodemTransmit(unsigned char *src, int srcsz);
 
 /*
 ** ComPort virtual thread processing function.
@@ -107,9 +107,6 @@ extern "C"
 #include "src\BASEFILE.HPP"
 #include "src\SCRIPT.HPP"
 #include "src\TMR.H"
-
-/* xScript Rx initial timeout maximum value. */
-#define TMR_TIMEOUT_MAX	32000
 
 /* Used in defining the Read block size. */
 #define BUFSIZE			128
@@ -974,551 +971,8 @@ void xScript::Run()
 		printf("Run rc=%d\n", Result);
 	e.Release();
 }
-#endif
-
-#ifdef TMR_TESTING
-class ATmr : CTimerFunc
-{
-	void Func(void)
-	{
-		putchar('.');
-	}
-};
-
-ATmr atmr;
-#endif
-
-#ifdef MDM_TESTING
-/*
-* Copyright 2001-2010 Georges Menie (www.menie.org)
-* All rights reserved.
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following conditions are met:
-*
-*     * Redistributions of source code must retain the above copyright
-*       notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above copyright
-*       notice, this list of conditions and the following disclaimer in the
-*       documentation and/or other materials provided with the distribution.
-*     * Neither the name of the University of California, Berkeley nor the
-*       names of its contributors may be used to endorse or promote products
-*       derived from this software without specific prior written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND ANY
-* EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-* WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-* DISCLAIMED. IN NO EVENT SHALL THE REGENTS AND CONTRIBUTORS BE LIABLE FOR ANY
-* DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-* (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-* LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-* ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-
-/* this code needs standard functions memcpy() and memset()
-and input/output functions _inbyte() and _outbyte().
-
-the prototypes of the input/output functions are:
-int _inbyte(unsigned short timeout); // msec timeout
-void _outbyte(int c);
-
-*/
-
-//#include "crc16.h"
-
-/*
-** Calculate a 16-bit 'CRC' value on a buffer.
-**
-** crc16 CCITT results matched with those provided by:
-** http://www.lammertbies.nl/comm/info/crc-calculation.html.
-*/
-
-unsigned short crc16_ccitt(const unsigned char* data, unsigned char length)
-{
-	unsigned char x;
-	unsigned short crc = 0xFFFF;
-
-	while (length--)
-	{
-		x = crc >> 8 ^ *data++;
-		x ^= x >> 4;
-		crc = (crc << 8) ^ ((unsigned short)(x << 12)) ^ ((unsigned short)(x << 5)) ^ ((unsigned short)x);
-	}
-	return crc;
-}
-
-
-#define SOH  0x01
-#define STX  0x02
-#define EOT  0x04
-#define ACK  0x06
-#define NAK  0x15
-#define CAN  0x18
-#define SUB  0x1A
-
-#define DLY_1S 1000
-#define MAXRETRANS 25
-#define TRANSMIT_XMODEM_1K
-
-static int check(int crc, const unsigned char *buf, int sz)
-{
-	if (crc) {
-		unsigned short crc = crc16_ccitt(buf, sz);
-		unsigned short tcrc = (buf[sz] << 8) + buf[sz + 1];
-		if (crc == tcrc)
-			return 1;
-	}
-	else {
-		int i;
-		unsigned char cks = 0;
-		for (i = 0; i < sz; ++i) {
-			cks += buf[i];
-		}
-		if (cks == buf[sz])
-			return 1;
-	}
-
-	return 0;
-}
-
-#define bufsize 65536
-
-circbuf rxbuf(bufsize);
-circbuf txbuf(bufsize);
-
-/* Recv return result codes. */
-#define RECV_PROCESSING       1
-#define RECV_SUCCESS          0
-#define RECV_EXIT            -1
-#define RECV_FILE_NOT_FOUND  -2
-#define RECV_ERROR           -3
-#define RECV_TIMEOUT         -5
-#define RECV_ABORTED        -12
-
-class Recv : public ActiveObject
-{
-public:
-	int Result;
-	Event e;
-
-	Recv()
-	{
-		TRACE("Recv() this=%08x\n", this);
-	}
-
-	~Recv()
-	{
-		TRACE("~Recv() this=%08x\n", this);
-	}
-
-	char *getname() { return "Recv"; }
-
-	int Begin(void)
-	{
-		Result = RECV_PROCESSING;
-		/* Run thread. */
-		Resume();
-		return Result;
-	}
-
-	int End(void)
-	{
-		/* Wait for result from processing. */
-		return WaitResult();
-	}
-
-	int GetResult() { return Result; }
-	int WaitResult() { e.Wait(); return GetResult(); }
-
-	int getbyte(void);
-	void putbyte(unsigned char b);
-	int _inbyte(int timeout);
-	void _outbyte(unsigned char b);
-	void _flushinput(void);
-	int xmodemReceive(unsigned char *dest, int destsz);
-
-private:
-	void InitThread() { }
-	void Run();
-	void FlushThread() { e.Release(); }
-
-};
-
-void Recv::Run()
-{
-	BOOL bSuccess = true;
-
-	/* Define a processing timer. */
-	Tmr tmr = TMR_New();
-	int Timeout = TMR_TIMEOUT_MAX;
-	TMR_Start(tmr, Timeout);
-
-	//TRACE("%s: Running...\n", getname());
-	printf("Run\n");
-
-	while (true)
-	{
-		if (log)
-		{
-			log->Flush();
-		}
-
-		if (_isDying)
-		{
-			printf("%s: Aborted!\n", getname());
-			Result = RECV_ABORTED;
-			break;
-		}
-#if 1	
-		printf("Send data using the xmodem protocol from your terminal emulator now...\n");
-		unsigned char *bufptr = (unsigned char *)malloc(bufsize);
-		int st = xmodemReceive(bufptr, bufsize);
-		if (st < 0)
-		{
-			printf("Xmodem receive error: status: %d\n", st);
-			bSuccess = FALSE;
-		}
-		else
-		{
-			printf("Xmodem successfully received %d bytes\n", st);
-		}
-		break;
-#endif
-	}
-	if (bSuccess)
-	{
-		TRACE("%s: Success\n", getname());
-		Result = RECV_SUCCESS;
-	}
-	else
-	{
-		TRACE("%s: Failed\n", getname());
-	}
-	TMR_Stop(tmr);
-	TMR_Delete(tmr);
-	if (Result)
-		printf("Run rc=%d\n", Result);
-	e.Release();
-}
-
-/* Receiver */
-
-int Recv::getbyte(void)
-{
-	int c;
-	if (rxbuf.remove(&c) != ERR_BUFFER)
-	{
-		printf("%s::getbyte: %02x\n", getname(), c);
-		return c;
-	}
-	return -1;
-}
-
-void Recv::putbyte(unsigned char b)
-{
-	int c = (b & 0xFF);
-	txbuf.insert(c);
-	printf("%s::putbyte: %02x\n", getname(), c);
-}
-
-int Recv::_inbyte(int timeout)
-{
-	int c = -1;
-	int count = timeout / 100;
-	for (count = (timeout / 100); count > 0 && ((c = getbyte()) == -1); count--)
-	{
-		Sleep(100);
-	}
-	return c;
-}
-
-void Recv::_outbyte(unsigned char b)
-{
-	putbyte(b);
-}
-
-void Recv::_flushinput(void)
-{
-	while (_inbyte(((DLY_1S) * 3) >> 1) >= 0)
-		;
-}
-
-int Recv::xmodemReceive(unsigned char *dest, int destsz)
-{
-	unsigned char xbuff[1030]; /* 1024 for XModem 1k + 3 head chars + 2 crc + nul */
-	unsigned char *p;
-	int bufsz, crc = 0;
-	unsigned char trychar = 'C';
-	unsigned char packetno = 1;
-	int i, c, len = 0;
-	int retry, retrans = MAXRETRANS;
-
-	for (;;) {
-		for (retry = 0; retry < 16; ++retry) {
-			if (trychar) _outbyte(trychar);
-			if ((c = _inbyte((DLY_1S) << 1)) >= 0) {
-				switch (c) {
-				case SOH:
-					bufsz = 128;
-					goto start_recv;
-				case STX:
-					bufsz = 1024;
-					goto start_recv;
-				case EOT:
-					_flushinput();
-					_outbyte(ACK);
-					return len; /* normal end */
-				case CAN:
-					if ((c = _inbyte(DLY_1S)) == CAN) {
-						_flushinput();
-						_outbyte(ACK);
-						return -1; /* canceled by remote */
-					}
-					break;
-				default:
-					break;
-				}
-			}
-		}
-		if (trychar == 'C') { trychar = NAK; continue; }
-		_flushinput();
-		_outbyte(CAN);
-		_outbyte(CAN);
-		_outbyte(CAN);
-		return -2; /* sync error */
-
-	start_recv:
-		if (trychar == 'C') crc = 1;
-		trychar = 0;
-		p = xbuff;
-		*p++ = c;
-		for (i = 0; i < (bufsz + (crc ? 1 : 0) + 3); ++i) {
-			if ((c = _inbyte(DLY_1S)) < 0) goto reject;
-			*p++ = c;
-		}
-
-		if (xbuff[1] == (unsigned char)(~xbuff[2]) &&
-			(xbuff[1] == packetno || xbuff[1] == (unsigned char)packetno - 1) &&
-			check(crc, &xbuff[3], bufsz)) {
-			if (xbuff[1] == packetno) {
-				register int count = destsz - len;
-				if (count > bufsz) count = bufsz;
-				if (count > 0) {
-					memcpy(&dest[len], &xbuff[3], count);
-					len += count;
-				}
-				++packetno;
-				retrans = MAXRETRANS + 1;
-			}
-			if (--retrans <= 0) {
-				_flushinput();
-				_outbyte(CAN);
-				_outbyte(CAN);
-				_outbyte(CAN);
-				return -3; /* too many retry error */
-			}
-			_outbyte(ACK);
-			continue;
-		}
-	reject:
-		_flushinput();
-		_outbyte(NAK);
-	}
-}
-
-/* Transmitter */
-int BUF_send_getchar(void)
-{
-	int c;
-	if (txbuf.remove(&c) != ERR_BUFFER)
-	{
-		printf("send_getchar: %02x\n", c);
-		return c;
-	}
-	return -1;
-}
-
-void BUF_send_putchar(unsigned char b)
-{
-	int c = (b & 0xFF);
-	rxbuf.insert(c);
-	printf("send_putchar: %02x\n", c);
-}
-
-int send_inbyte(int timeout)
-{
-	int c = -1;
-	int count = timeout / 100;
-	for (count = (timeout / 100); count > 0 && ((c = BUF_send_getchar()) == -1); count--)
-	{
-		Sleep(100);
-	}
-	return c;
-}
-
-void send_outbyte(unsigned char b)
-{
-	BUF_send_putchar(b);
-}
-
-static void send_flushinput(void)
-{
-	while (send_inbyte(((DLY_1S) * 3) >> 1) >= 0)
-		;
-}
-
-int xmodemTransmit(unsigned char *src, int srcsz)
-{
-	unsigned char xbuff[1030]; /* 1024 for XModem 1k + 3 head chars + 2 crc + nul */
-	int bufsz, crc = -1;
-	unsigned char packetno = 1;
-	int i, c, len = 0;
-	int retry;
-
-	for (;;) {
-		for (retry = 0; retry < 16; ++retry) {
-			if ((c = send_inbyte((DLY_1S) << 1)) >= 0) {
-				switch (c) {
-				case 'C':
-					crc = 1;
-					goto start_trans;
-				case NAK:
-					crc = 0;
-					goto start_trans;
-				case CAN:
-					if ((c = send_inbyte(DLY_1S)) == CAN) {
-						send_outbyte(ACK);
-						send_flushinput();
-						return -1; /* canceled by remote */
-					}
-					break;
-				default:
-					break;
-				}
-			}
-		}
-		send_outbyte(CAN);
-		send_outbyte(CAN);
-		send_outbyte(CAN);
-		send_flushinput();
-		return -2; /* no sync */
-
-		for (;;) {
-		start_trans:
-#ifdef TRANSMIT_XMODEM_1K
-			xbuff[0] = STX; bufsz = 1024;
-#else
-			xbuff[0] = SOH; bufsz = 128;
-#endif
-			xbuff[1] = packetno;
-			xbuff[2] = ~packetno;
-			c = srcsz - len;
-			if (c > bufsz) c = bufsz;
-			if (c > 0) {
-				memset(&xbuff[3], 0, bufsz);
-				memcpy(&xbuff[3], &src[len], c);
-				if (c < bufsz) xbuff[3 + c] = SUB;
-				if (crc) {
-					unsigned short ccrc = crc16_ccitt(&xbuff[3], bufsz);
-					xbuff[bufsz + 3] = (ccrc >> 8) & 0xFF;
-					xbuff[bufsz + 4] = ccrc & 0xFF;
-				}
-				else {
-					unsigned char ccks = 0;
-					for (i = 3; i < bufsz + 3; ++i) {
-						ccks += xbuff[i];
-					}
-					xbuff[bufsz + 3] = ccks;
-				}
-				for (retry = 0; retry < MAXRETRANS; ++retry) {
-					for (i = 0; i < bufsz + 4 + (crc ? 1 : 0); ++i) {
-						send_outbyte(xbuff[i]);
-					}
-					if ((c = send_inbyte(DLY_1S)) >= 0) {
-						switch (c) {
-						case ACK:
-							++packetno;
-							len += bufsz;
-							goto start_trans;
-						case CAN:
-							if ((c = send_inbyte(DLY_1S)) == CAN) {
-								send_outbyte(ACK);
-								send_flushinput();
-								return -1; /* canceled by remote */
-							}
-							break;
-						case NAK:
-						default:
-							break;
-						}
-					}
-				}
-				send_outbyte(CAN);
-				send_outbyte(CAN);
-				send_outbyte(CAN);
-				send_flushinput();
-				return -4; /* xmit error */
-			}
-			else {
-				for (retry = 0; retry < 10; ++retry) {
-					send_outbyte(EOT);
-					if ((c = send_inbyte((DLY_1S) << 1)) == ACK) break;
-				}
-				send_flushinput();
-				return (c == ACK) ? len : -5;
-			}
-		}
-	}
-}
-
-#ifdef TEST_XMODEM_RECEIVE
-int main(void)
-{
-	int st;
-
-	printf("Send data using the xmodem protocol from your terminal emulator now...\n");
-	/* the following should be changed for your environment:
-	0x30000 is the download address,
-	65536 is the maximum size to be written at this address
-	*/
-	st = xmodemReceive((char *)0x30000, 65536);
-	if (st < 0) {
-		printf("Xmodem receive error: status: %d\n", st);
-	}
-	else {
-		printf("Xmodem successfully received %d bytes\n", st);
-	}
-
-	return 0;
-}
-#endif
-
-#ifdef TEST_XMODEM_SEND
-int main(void)
-{
-	int st;
-
-	printf("Prepare your terminal emulator to receive data now...\n");
-	/* the following should be changed for your environment:
-	0x30000 is the download address,
-	12000 is the maximum size to be send from this address
-	*/
-	st = xmodemTransmit((char *)0x30000, 12000);
-	if (st < 0) {
-		printf("Xmodem transmit error: status: %d\n", st);
-	}
-	else {
-		printf("Xmodem successfully transmitted %d bytes\n", st);
-	}
-
-	return 0;
-}
-#endif
-#endif
 
 /* Local variables */
-
 SCRIPT spt;
 
 char cflag = 0;  						// compile script
@@ -1550,17 +1004,17 @@ int _main(int argc, char *argv[])
 				{
 				case 'o':
 					oflag++;
-					if (strlen(p+1))
+					if (strlen(p + 1))
 					{
-						ofile = p+1;
+						ofile = p + 1;
 					}
 					p = " ";
 					break;
 
 				case 'l':
-					if (strlen(p+1))
+					if (strlen(p + 1))
 					{
-						lfile = p+1;
+						lfile = p + 1;
 					}
 					p = " ";
 					break;
@@ -1612,7 +1066,7 @@ int _main(int argc, char *argv[])
 		strcpy(ifname, ifile);
 		if (!strchr(ifname, '.'))
 		{
-			strcat(ifname, (cflag)? ".spt" : ".out");
+			strcat(ifname, (cflag) ? ".spt" : ".out");
 		}
 		ifile = ifname;
 		DEBUG("ifile='%s'\n", ifile);
@@ -1716,24 +1170,679 @@ int _main(int argc, char *argv[])
 		}
 	}
 
+	COM_Term();
+	TMR_Term();
+
+	// Close capture log file.
+	LOG_Term();
+
+	return 0;
+}
+
+int main(int argc, char *argv[])
+{
+	argv[0] = "winlib";
+	argv[1] = "c:\\temp\\test3.spt";
+	argv[2] = "-lc:\\temp\\test3.log";
+	argv[3] = "-c";
+	argv[4] = "-e";
+	argv[5] = "-d";
+	//argv[6] = "-o";
+	//argv[7] = "-q";
+	//argc = 8;
+	argc = 6;
+
+	return _main(argc, argv);
+}
+#endif
+
 #ifdef MDM_TESTING
-	/* Initialize the Recv thread. */
+/*
+* Copyright 2001-2010 Georges Menie (www.menie.org)
+* All rights reserved.
+* Redistribution and use in source and binary forms, with or without
+* modification, are permitted provided that the following conditions are met:
+*
+*     * Redistributions of source code must retain the above copyright
+*       notice, this list of conditions and the following disclaimer.
+*     * Redistributions in binary form must reproduce the above copyright
+*       notice, this list of conditions and the following disclaimer in the
+*       documentation and/or other materials provided with the distribution.
+*     * Neither the name of the University of California, Berkeley nor the
+*       names of its contributors may be used to endorse or promote products
+*       derived from this software without specific prior written permission.
+*
+* THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND ANY
+* EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+* WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+* DISCLAIMED. IN NO EVENT SHALL THE REGENTS AND CONTRIBUTORS BE LIABLE FOR ANY
+* DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+* (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+* LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+* ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
+/* this code needs standard functions memcpy() and memset()
+and input/output functions _inbyte() and _outbyte().
+
+the prototypes of the input/output functions are:
+int _inbyte(unsigned short timeout); // msec timeout
+void _outbyte(int c);
+
+*/
+
+//#include "crc16.h"
+
+/*
+** Calculate a 16-bit 'CRC' value on a buffer.
+**
+** crc16 CCITT results matched with those provided by:
+** http://www.lammertbies.nl/comm/info/crc-calculation.html.
+*/
+
+unsigned short crc16_ccitt(const unsigned char* data, unsigned char length)
+{
+	unsigned char x;
+	unsigned short crc = 0xFFFF;
+
+	while (length--)
+	{
+		x = crc >> 8 ^ *data++;
+		x ^= x >> 4;
+		crc = (crc << 8) ^ ((unsigned short)(x << 12)) ^ ((unsigned short)(x << 5)) ^ ((unsigned short)x);
+	}
+	return crc;
+}
+
+
+#define SOH  0x01
+#define STX  0x02
+#define EOT  0x04
+#define ACK  0x06
+#define NAK  0x15
+#define CAN  0x18
+#define SUB  0x1A
+
+#define DLY_1S 1000
+#define MAXRETRANS 25
+#define TRANSMIT_XMODEM_1K
+
+static int check(int crc, const unsigned char *buf, int sz)
+{
+	if (crc) {
+		unsigned short crc = crc16_ccitt(buf, sz);
+		unsigned short tcrc = (buf[sz] << 8) + buf[sz + 1];
+		if (crc == tcrc)
+			return 1;
+	}
+	else {
+		int i;
+		unsigned char cks = 0;
+		for (i = 0; i < sz; ++i) {
+			cks += buf[i];
+		}
+		if (cks == buf[sz])
+			return 1;
+	}
+
+	return 0;
+}
+
+#define bufsize 2000
+
+circbuf rxbuf(bufsize);
+circbuf txbuf(bufsize);
+
+/* Recv return result codes. */
+#define MDM_PROCESSING       1
+#define MDM_SUCCESS          0
+#define MDM_EXIT            -1
+#define MDM_FILE_NOT_FOUND  -2
+#define MDM_ERROR           -3
+#define MDM_TIMEOUT         -5
+#define MDM_ABORTED        -12
+
+class Recv : public ActiveObject
+{
+public:
+	int Result;
+	Event e;
+
+	Recv()
+	{
+		//TRACE("Recv() this=%08x\n", this);
+	}
+
+	~Recv()
+	{
+		//TRACE("~Recv() this=%08x\n", this);
+	}
+
+	char *getname() { return "Recv"; }
+
+	int Begin(void)
+	{
+		Result = MDM_PROCESSING;
+		/* Run thread. */
+		Resume();
+		return Result;
+	}
+
+	int End(void)
+	{
+		/* Wait for result from processing. */
+		return WaitResult();
+	}
+
+	int GetResult() { return Result; }
+	int WaitResult() { e.Wait(); return GetResult(); }
+
+	int getbyte(void);
+	void putbyte(unsigned char b);
+	int _inbyte(int timeout);
+	void _outbyte(unsigned char b);
+	void _flushinput(void);
+	int Process(unsigned char *dest, int destsz);
+
+private:
+	void InitThread() { }
+	void Run();
+	void FlushThread() { e.Release(); }
+};
+
+void Recv::Run()
+{
+	BOOL bSuccess = true;
+
+	/* Define a processing timer. */
+	Tmr tmr = TMR_New();
+	int Timeout = TMR_TIMEOUT_MAX;
+	TMR_Start(tmr, Timeout);
+	printf("%s: Run\n", getname());
+
+	while (bSuccess)
+	{
+		if (log)
+		{
+			log->Flush();
+		}
+		if (_isDying)
+		{
+			printf("%s: Aborted!\n", getname());
+			Result = MDM_ABORTED;
+			break;
+		}
+		unsigned char *bufptr = (unsigned char *)malloc(bufsize);
+		int st = Process(bufptr, bufsize);
+		if (st < 0)
+		{
+			printf("%s: Failure, status=%d\n", getname(), st);
+			Result = MDM_ERROR;
+			bSuccess = false;
+		}
+		else
+		{
+			printf("%s: Success: %d bytes\n", getname(), st);
+			Result = MDM_SUCCESS;
+			bSuccess = false;
+		}
+	}
+
+	printf("%s: Run rc=%d\n", getname(), Result);
+	TMR_Stop(tmr);
+	TMR_Delete(tmr);
+	e.Release();
+}
+
+int Recv::getbyte(void)
+{
+	int c;
+	if (rxbuf.remove(&c) != ERR_BUFFER)
+	{
+		return c;
+	}
+	return -1;
+}
+
+void Recv::putbyte(unsigned char b)
+{
+	int c = (b & 0xFF);
+	txbuf.insert(c);
+}
+
+int Recv::_inbyte(int timeout)
+{
+	int c = -1;
+	for (int count = timeout; count > 0 && ((c = getbyte()) == -1); count--)
+	{
+		Sleep(1);
+	}
+	return c;
+}
+
+void Recv::_outbyte(unsigned char b)
+{
+	putbyte(b);
+	Sleep(1);
+}
+
+void Recv::_flushinput(void)
+{
+	while (_inbyte(((DLY_1S) * 3) >> 1) >= 0)
+		;
+}
+
+int Recv::Process(unsigned char *dest, int destsz)
+{
+	unsigned char xbuff[1030]; /* 1024 for XModem 1k + 3 head chars + 2 crc + nul */
+	unsigned char *p;
+	int bufsz, crc = 0;
+	unsigned char trychar = 'C';
+	unsigned char packetno = 1;
+	int i, c, len = 0;
+	int retry, retrans = MAXRETRANS;
+
+	for (;;)
+	{
+		for (retry = 0; retry < 16; ++retry)
+		{
+			if (trychar) 
+				_outbyte(trychar);
+			if ((c = _inbyte((DLY_1S) << 1)) >= 0)
+			{
+				switch(c)
+				{
+				case SOH:
+					bufsz = 128;
+					goto start_recv;
+				case STX:
+					bufsz = 1024;
+					goto start_recv;
+				case EOT:
+					_flushinput();
+					_outbyte(ACK);
+					TRACE("%s: ACK\n", getname());
+					return len; /* normal end */
+				case CAN:
+					if ((c = _inbyte(DLY_1S)) == CAN)
+					{
+						_flushinput();
+						_outbyte(ACK);
+						TRACE("%s: ACK\n", getname());
+						return -1; /* canceled by remote */
+					}
+					break;
+				default:
+					break;
+				}
+			}
+		}
+		if (trychar == 'C')
+		{
+			trychar = NAK; 
+			continue;
+		}
+		_flushinput();
+		_outbyte(CAN);
+		_outbyte(CAN);
+		_outbyte(CAN);
+		TRACE("%s: CAN\n", getname());
+		return -2; /* sync error */
+
+	start_recv:
+		TRACE("%s: bufsz=%d\n", getname(), bufsz);
+		if (trychar == 'C')
+			crc = 1;
+		trychar = 0;
+		p = xbuff;
+		*p++ = c;
+		for (i = 0; i < (bufsz + (crc ? 1 : 0) + 3); ++i)
+		{
+			if ((c = _inbyte(DLY_1S)) < 0)
+				goto reject;
+			*p++ = c;
+		}
+
+		if (xbuff[1] == (unsigned char)(~xbuff[2]) &&
+			(xbuff[1] == packetno || xbuff[1] == (unsigned char)packetno - 1) &&
+			check(crc, &xbuff[3], bufsz))
+		{
+			if (xbuff[1] == packetno)
+			{
+				register int count = destsz - len;
+				if (count > bufsz)
+					count = bufsz;
+				if (count > 0)
+				{
+					memcpy(&dest[len], &xbuff[3], count);
+					len += count;
+					TRACE("%s: PACKET\n", getname());
+				}
+				++packetno;
+				retrans = MAXRETRANS + 1;
+			}
+			if (--retrans <= 0)
+			{
+				_flushinput();
+				_outbyte(CAN);
+				_outbyte(CAN);
+				_outbyte(CAN);
+				TRACE("%s: CAN\n", getname());
+				return -3; /* too many retry error */
+			}
+			_outbyte(ACK);
+			TRACE("%s: ACK\n",getname());
+			continue;
+		}
+	reject:
+		_flushinput();
+		_outbyte(NAK);
+		TRACE("%s: NAK\n", getname());
+	}
+}
+
+class Send : public ActiveObject
+{
+public:
+	int Result;
+	Event e;
+
+	Send()
+	{
+		//TRACE("Send() this=%08x\n", this);
+	}
+
+	~Send()
+	{
+		//TRACE("~Send() this=%08x\n", this);
+	}
+
+	char *getname() { return "Send"; }
+
+	int Begin(void)
+	{
+		Result = MDM_PROCESSING;
+		/* Run thread. */
+		Resume();
+		return Result;
+	}
+
+	int End(void)
+	{
+		/* Wait for result from processing. */
+		return WaitResult();
+	}
+
+	int GetResult() { return Result; }
+	int WaitResult() { e.Wait(); return GetResult(); }
+
+	int getbyte(void);
+	void putbyte(unsigned char b);
+	int _inbyte(int timeout);
+	void _outbyte(unsigned char b);
+	void _flushinput(void);
+	int Process(unsigned char *dest, int destsz);
+
+private:
+	void InitThread() { }
+	void Run();
+	void FlushThread() { e.Release(); }
+};
+
+void Send::Run()
+{
+	BOOL bSuccess = true;
+
+	/* Define a processing timer. */
+	Tmr tmr = TMR_New();
+	int Timeout = TMR_TIMEOUT_MAX;
+	TMR_Start(tmr, Timeout);
+	printf("%s: Run\n", getname());
+
+	while (bSuccess)
+	{
+		if (log)
+		{
+			log->Flush();
+		}
+		if (_isDying)
+		{
+			printf("%s: Aborted!\n", getname());
+			Result = MDM_ABORTED;
+			break;
+		}
+		unsigned char *bufptr = (unsigned char *)malloc(bufsize);
+		memset(bufptr, 0xFF, bufsize);
+		int st = Process(bufptr, bufsize);
+		if (st < 0)
+		{
+			printf("%s: Failure, status=%d\n", getname(), st);
+			Result = MDM_ERROR;
+			bSuccess = false;
+		}
+		else
+		{
+			printf("%s: Success, %d bytes\n", getname(), st);
+			Result = MDM_SUCCESS;
+			bSuccess = false;
+		}
+	}
+
+	printf("%s: Run rc=%d\n", getname(), Result);
+	TMR_Stop(tmr);
+	TMR_Delete(tmr);
+	e.Release();
+}
+
+int Send::getbyte(void)
+{
+	int c;
+	if (txbuf.remove(&c) != ERR_BUFFER)
+	{
+		return c;
+	}
+	return -1;
+}
+
+void Send::putbyte(unsigned char b)
+{
+	int c = (b & 0xFF);
+	rxbuf.insert(c);
+}
+
+int Send::_inbyte(int timeout)
+{
+	int c = -1;
+	for (int count = timeout; count > 0 && ((c = getbyte()) == -1); count--)
+	{
+		Sleep(1);
+	}
+	return c;
+}
+
+void Send::_outbyte(unsigned char b)
+{
+	putbyte(b);
+	Sleep(1);
+}
+
+void Send::_flushinput(void)
+{
+	while (_inbyte(((DLY_1S) * 3) >> 1) >= 0)
+		;
+}
+
+int Send::Process(unsigned char *src, int srcsz)
+{
+	unsigned char xbuff[1030]; /* 1024 for XModem 1k + 3 head chars + 2 crc + nul */
+	int bufsz, crc = -1;
+	unsigned char packetno = 1;
+	int i, c, len = 0;
+	int retry;
+
+	for (;;)
+	{
+		for (retry = 0; retry < 16; ++retry)
+		{
+			if ((c = _inbyte((DLY_1S) << 1)) >= 0)
+			{
+				switch(c)
+				{
+				case 'C':
+					crc = 1;
+					goto start_trans;
+				case NAK:
+					crc = 0;
+					goto start_trans;
+				case CAN:
+					if ((c = _inbyte(DLY_1S)) == CAN)
+					{
+						_outbyte(ACK);
+						_flushinput();
+						return -1; /* canceled by remote */
+					}
+					break;
+				default:
+					break;
+				}
+			}
+		}
+		_outbyte(CAN);
+		_outbyte(CAN);
+		_outbyte(CAN);
+		_flushinput();
+		return -2; /* no sync */
+
+		for (;;)
+		{
+		start_trans:
+#ifdef TRANSMIT_XMODEM_1K
+			xbuff[0] = STX; bufsz = 1024;
+#else
+			xbuff[0] = SOH; bufsz = 128;
+#endif
+			xbuff[1] = packetno;
+			xbuff[2] = ~packetno;
+			c = srcsz - len;
+			if (c > bufsz)
+				c = bufsz;
+			if (c > 0)
+			{
+				memset(&xbuff[3], 0, bufsz);
+				memcpy(&xbuff[3], &src[len], c);
+				if (c < bufsz)
+					xbuff[3 + c] = SUB;
+				if (crc)
+				{
+					unsigned short ccrc = crc16_ccitt(&xbuff[3], bufsz);
+					xbuff[bufsz + 3] = (ccrc >> 8) & 0xFF;
+					xbuff[bufsz + 4] = ccrc & 0xFF;
+				}
+				else
+				{
+					unsigned char ccks = 0;
+					for (i = 3; i < bufsz + 3; ++i)
+					{
+						ccks += xbuff[i];
+					}
+					xbuff[bufsz + 3] = ccks;
+				}
+				for (retry = 0; retry < MAXRETRANS; ++retry)
+				{
+					for (i = 0; i < bufsz + 4 + (crc ? 1 : 0); ++i)
+					{
+						_outbyte(xbuff[i]);
+					}
+					if ((c = _inbyte(DLY_1S)) >= 0)
+					{
+						switch(c)
+						{
+						case ACK:
+							++packetno;
+							len += bufsz;
+							goto start_trans;
+						case CAN:
+							if ((c = _inbyte(DLY_1S)) == CAN)
+							{
+								_outbyte(ACK);
+								_flushinput();
+								return -1; /* canceled by remote */
+							}
+							break;
+						case NAK:
+						default:
+							break;
+						}
+					}
+				}
+				_outbyte(CAN);
+				_outbyte(CAN);
+				_outbyte(CAN);
+				_flushinput();
+				return -4; /* xmit error */
+			}
+			else
+			{
+				for (retry = 0; retry < 10; ++retry)
+				{
+					_outbyte(EOT);
+					if ((c = _inbyte((DLY_1S) << 1)) == ACK)
+						break;
+				}
+				_flushinput();
+				return (c == ACK)? len : -5;
+			}
+		}
+	}
+}
+#endif
+
+#ifdef MDM_TESTING
+char qflag = 0;  						// quiet mode
+
+int main(int argc, char *argv[])
+{
+	// Open log file to capture output from putchar, puts and printf macros.
+	LOG_Init("c:\\temp\\winlib.log");
+
+	TMR_Init(100);	// 100ms timebase
+
+	/* Initialize the Recv & Send thread. */
 	Recv *recv = new Recv();
+	Send *send = new Send();
 
-	/* Execute the Recv processing. */
-	rc = recv->Begin();
-	Sleep(5000);
+	/* Execute the Recv & Send processing. */
+	recv->Begin();
+	Sleep(500);
+	send->Begin();
+	Sleep(30000);
+	send->End();
+	recv->End();
 
+	send->Kill();
 	recv->Kill();
 
-	rc = recv->End();
-	printf("Result=%d\n", rc);
-	
-	/* Terminate the Recv thread. */
+	/* Terminate the Recv & Send thread. */
+	delete send;
 	delete recv;
+
+	TMR_Term();
+
+	// Close capture log file.
+	LOG_Term();
+
+	return 0;
+}
 #endif
 
 #ifdef COM_TESTING
+int main(int argc, char *argv[])
+{
+	TMR_Init(100);	// 100ms timebase
+	COM_Init(3,115200);
+
 	unsigned char buf[80];
 	com.Write("AT\r", 3);
 	com.Sleep(2000);
@@ -1746,10 +1855,28 @@ int _main(int argc, char *argv[])
 		}
 		putchar('\n');
 	}
+	COM_Term();
+	TMR_Term();
+
+	return 0;
+}
 #endif
 
 #ifdef TMR_TESTING
-	/* Timer testing. */
+class ATmr : CTimerFunc
+{
+	void Func(void)
+	{
+		putchar('.');
+	}
+};
+
+ATmr atmr;
+
+int main(int argc, char *argv[])
+{
+	TMR_Init(100);	// 100ms timebase
+
 	printf("\nset 1 second timer ");
 	Tmr t = TMR_New();
 	TMR_Start(t, 10);
@@ -1768,30 +1895,9 @@ int _main(int argc, char *argv[])
 	printf("5 seconds ");
 	TMR_Event(0, (CTimerEvent *)&atmr, PERIODIC);
 	putchar('\n');
-#endif
-	COM_Term();
-	TMR_Term();
 
-	// Close capture log file.
-	LOG_Term();
+	TMR_Term();
 	
 	return 0;
-}
-
-#ifdef CLI_TESTING
-int main(int argc, char *argv[])
-{
-	argv[0] = "winlib";
-	argv[1] = "c:\\temp\\test3.spt";
-	argv[2] = "-lc:\\temp\\test3.log";
-	argv[3] = "-c";
-	argv[4] = "-e";
-	argv[5] = "-d";
-	//argv[6] = "-o";
-	//argv[7] = "-q";
-	//argc = 8;
-	argc = 6;
-
-	return _main(argc, argv);
 }
 #endif
