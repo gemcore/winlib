@@ -33,7 +33,8 @@
 #endif
 
 #undef TRACE
-#define TRACE(fmt,...)	printf(fmt,__VA_ARGS__)
+//#define TRACE(fmt,...)	printf(fmt,__VA_ARGS__)
+#define TRACE(...)
 #undef DEBUG
 #define DEBUG(...)
 
@@ -916,6 +917,7 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 			}
 			else  if (!strcmp(tp, sg[SCRIPT_ECHO].szKey))
 			{
+				int label = -1;
 				if ((tp = strtok(NULL, tokeol)) != NULL)
 				{
 					char *pSrc = tp;
@@ -941,13 +943,13 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 								pSrc++;
 
 								char szByte[3];
-								szByte[0] = *pSrc++;   // high nibble
-								szByte[1] = *pSrc++;   // low nibble
+								szByte[0] = *pSrc++;	// high nibble
+								szByte[1] = *pSrc++;	// low nibble
 								szByte[2] = 0;
 
 								if (!isxdigit(szByte[0]) || !isxdigit(szByte[1]))
 								{
-									sprintf((char *)szInfo, "Invalid hex digit %s", tp);
+									sprintf(szInfo, "Invalid hex digit %s", tp);
 									lasterr = -3;
 									goto err;
 								}
@@ -960,6 +962,7 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 					*pDest = 0;
 				}
 				Rec[RecIndex].iType = SCRIPT_ECHO;
+				Rec[RecIndex].iNext = label;					// Label to jump to on errors
 			}
 			else  if (isdigit(*tp))
 			{
