@@ -1267,7 +1267,7 @@ unsigned short crc16_ccitt(const unsigned char* data, unsigned char length)
 
 #define DLY_1S 1000
 #define MAXRETRANS 25
-#define TRANSMIT_XMODEM_1K
+//#define TRANSMIT_XMODEM_1K
 
 static int check(int crc, const unsigned char *buf, int sz)
 {
@@ -1290,7 +1290,7 @@ static int check(int crc, const unsigned char *buf, int sz)
 	return 0;
 }
 
-#define bufsize 2000
+#define bufsize				(1024*16)
 
 circbuf rxbuf(bufsize);
 circbuf txbuf(bufsize);
@@ -1312,12 +1312,12 @@ public:
 
 	Recv()
 	{
-		//TRACE("Recv() this=%08x\n", this);
+		TRACE("%s()\n", getname());
 	}
 
 	~Recv()
 	{
-		//TRACE("~Recv() this=%08x\n", this);
+		TRACE("~%s()\n", getname());
 	}
 
 	char *getname() { return "Recv"; }
@@ -1328,12 +1328,6 @@ public:
 		/* Run thread. */
 		Resume();
 		return Result;
-	}
-
-	int End(void)
-	{
-		/* Wait for result from processing. */
-		return WaitResult();
 	}
 
 	int GetResult() { return Result; }
@@ -1415,9 +1409,9 @@ void Recv::putbyte(unsigned char b)
 int Recv::_inbyte(int timeout)
 {
 	int c = -1;
-	for (int count = timeout; count > 0 && ((c = getbyte()) == -1); count--)
+	for (int count = timeout/10; count > 0 && ((c = getbyte()) == -1); count--)
 	{
-		Sleep(1);
+		Sleep(10);
 	}
 	return c;
 }
@@ -1519,6 +1513,7 @@ int Recv::Process(unsigned char *dest, int destsz)
 					memcpy(&dest[len], &xbuff[3], count);
 					len += count;
 					TRACE("%s: PACKET\n", getname());
+					MEM_Dump(xbuff, count, len);
 				}
 				++packetno;
 				retrans = MAXRETRANS + 1;
@@ -1543,36 +1538,50 @@ int Recv::Process(unsigned char *dest, int destsz)
 	}
 }
 
+
 class Send : public ActiveObject
 {
 public:
 	int Result;
 	Event e;
+	BASEFILE bf;
 
 	Send()
 	{
-		//TRACE("Send() this=%08x\n", this);
+		TRACE("%s()\n", getname());
+	}
+
+	Send(char *filename)
+	{
+		TRACE("%s(%s)\n", getname(), filename);
+		bf.InitReadFile(filename);
 	}
 
 	~Send()
 	{
-		//TRACE("~Send() this=%08x\n", this);
+		TRACE("~%s()\n", getname());
 	}
 
 	char *getname() { return "Send"; }
 
 	int Begin(void)
 	{
-		Result = MDM_PROCESSING;
-		/* Run thread. */
-		Resume();
-		return Result;
-	}
+		/* Determine the size of the image file. */
+		if (!bf.IsFile())
+		{
+			printf("%s: file not found!\n", getname());
+			Result = MDM_FILE_NOT_FOUND;
+		}
+		else
+		{
+			long size = bf.Filesize();
+			printf("%s: file size=%08x bytes\n", getname(), size);
+			Result = MDM_PROCESSING;
 
-	int End(void)
-	{
-		/* Wait for result from processing. */
-		return WaitResult();
+			/* Run thread. */
+			Resume();
+		}
+		return Result;
 	}
 
 	int GetResult() { return Result; }
@@ -1594,7 +1603,6 @@ private:
 void Send::Run()
 {
 	BOOL bSuccess = true;
-
 	/* Define a processing timer. */
 	Tmr tmr = TMR_New();
 	int Timeout = TMR_TIMEOUT_MAX;
@@ -1613,9 +1621,17 @@ void Send::Run()
 			Result = MDM_ABORTED;
 			break;
 		}
-		unsigned char *bufptr = (unsigned char *)malloc(bufsize);
-		memset(bufptr, 0xFF, bufsize);
-		int st = Process(bufptr, bufsize);
+		long size;
+#if 0
+		size = bufsize;
+		unsigned char *bufptr = (unsigned char *)malloc(size);
+		memset(bufptr, 0xFF, size);
+#else
+		size = bf.Filesize();
+		unsigned char *bufptr = (unsigned char *)malloc(size);
+		bf.ReadfromFile((DWORD)size, (BYTE *)bufptr);
+#endif
+		int st = Process(bufptr, size);
 		if (st < 0)
 		{
 			printf("%s: Failure, status=%d\n", getname(), st);
@@ -1655,9 +1671,9 @@ void Send::putbyte(unsigned char b)
 int Send::_inbyte(int timeout)
 {
 	int c = -1;
-	for (int count = timeout; count > 0 && ((c = getbyte()) == -1); count--)
+	for (int count = timeout/10; count > 0 && ((c = getbyte()) == -1); count--)
 	{
-		Sleep(1);
+		Sleep(10);
 	}
 	return c;
 }
@@ -1731,7 +1747,11 @@ int Send::Process(unsigned char *src, int srcsz)
 			if (c > 0)
 			{
 				memset(&xbuff[3], 0, bufsz);
+#if 1
 				memcpy(&xbuff[3], &src[len], c);
+#else
+				bf.ReadfromFile((DWORD)c, (BYTE *)&xbuff[3]);
+#endif
 				if (c < bufsz)
 					xbuff[3 + c] = SUB;
 				if (crc)
@@ -1809,20 +1829,16 @@ int main(int argc, char *argv[])
 
 	TMR_Init(100);	// 100ms timebase
 
-	/* Initialize the Recv & Send thread. */
+	/* Initialize the Recv & Send threads. */
 	Recv *recv = new Recv();
-	Send *send = new Send();
+	Send *send = new Send("C:\\temp\\cfg.spt");
 
-	/* Execute the Recv & Send processing. */
+	/* Begin execution of processing. */
 	recv->Begin();
-	Sleep(500);
+	Sleep(100);
 	send->Begin();
-	Sleep(30000);
-	send->End();
-	recv->End();
-
-	send->Kill();
-	recv->Kill();
+	send->WaitResult();
+	recv->WaitResult();
 
 	/* Terminate the Recv & Send thread. */
 	delete send;
