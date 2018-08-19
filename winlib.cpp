@@ -1304,57 +1304,74 @@ circbuf txbuf(bufsize);
 #define MDM_TIMEOUT         -5
 #define MDM_ABORTED        -12
 
-class Recv : public ActiveObject
+class Recv;
+
+class XModem : public ActiveObject
 {
+private:
+	void InitThread() { }
+	void Run();
+	void FlushThread() { e.Release(); }
+
 public:
+	BASEFILE *bf;
 	int Result;
 	Event e;
 
-	Recv()
+	XModem()
 	{
-		TRACE("%s()\n", getname());
 	}
 
-	~Recv()
+	~XModem()
 	{
-		TRACE("~%s()\n", getname());
 	}
-
-	char *getname() { return "Recv"; }
 
 	int Begin(void)
 	{
-		Result = MDM_PROCESSING;
-		/* Run thread. */
-		Resume();
+		if (bf)
+		{
+			if (bf->IsFile())
+			{
+				Result = MDM_PROCESSING;
+
+				/* Run thread. */
+				Resume();
+			}
+			else
+			{
+				Result = MDM_FILE_NOT_FOUND;
+			}
+		}
+		else
+		{
+			Result = MDM_ERROR;
+		}
 		return Result;
 	}
 
 	int GetResult() { return Result; }
 	int WaitResult() { e.Wait(); return GetResult(); }
 
-	int getbyte(void);
-	void putbyte(unsigned char b);
 	int _inbyte(int timeout);
 	void _outbyte(unsigned char b);
 	void _flushinput(void);
-	int Process(unsigned char *dest, int destsz);
 
-private:
-	void InitThread() { }
-	void Run();
-	void FlushThread() { e.Release(); }
+	virtual char *getname() { return ""; }
+	virtual int getbyte(void) { return -1; }
+	virtual void putbyte(unsigned char b) { }
+	virtual bool Init(void) { return false; }
+	virtual int Process(void) { return -1; }
 };
 
-void Recv::Run()
+void XModem::Run()
 {
 	BOOL bSuccess = true;
 
 	/* Define a processing timer. */
-	Tmr tmr = TMR_New();
-	int Timeout = TMR_TIMEOUT_MAX;
-	TMR_Start(tmr, Timeout);
-	printf("%s: Run\n", getname());
+	//Tmr tmr = TMR_New();
+	//int Timeout = TMR_TIMEOUT_MAX;
+	//TMR_Start(tmr, Timeout);
+	printf("%s: Processing\n", getname());
 
 	while (bSuccess)
 	{
@@ -1368,8 +1385,7 @@ void Recv::Run()
 			Result = MDM_ABORTED;
 			break;
 		}
-		unsigned char *bufptr = (unsigned char *)malloc(bufsize);
-		int st = Process(bufptr, bufsize);
+		int st = Process();
 		if (st < 0)
 		{
 			printf("%s: Failure, status=%d\n", getname(), st);
@@ -1384,11 +1400,54 @@ void Recv::Run()
 		}
 	}
 
-	printf("%s: Run rc=%d\n", getname(), Result);
-	TMR_Stop(tmr);
-	TMR_Delete(tmr);
+	//TMR_Stop(tmr);
+	//TMR_Delete(tmr);
+	printf("%s: Result=%d\n", getname(), Result);
 	e.Release();
 }
+
+int XModem::_inbyte(int timeout)
+{
+	int c = -1;
+	for (int count = timeout/10; count > 0 && ((c = getbyte()) == -1); count--)
+	{
+		Sleep(10);
+	}
+	return c;
+}
+
+void XModem::_outbyte(unsigned char b)
+{
+	putbyte(b);
+	Sleep(1);
+}
+
+void XModem::_flushinput(void)
+{
+	while (_inbyte(((DLY_1S) * 3) >> 1) >= 0)
+		;
+}
+
+class Recv : public XModem
+{
+public:
+	Recv(char *filename) : XModem()
+	{
+		TRACE("%s(%s)\n", getname(), filename);
+		bf = new BASEFILE(false, filename);
+	}
+
+	~Recv()
+	{
+		TRACE("~%s()\n", getname());
+		delete bf;
+	}
+
+	char *getname() { return "Recv"; }
+	int getbyte(void);
+	void putbyte(unsigned char b);
+	int Process(void);
+};
 
 int Recv::getbyte(void)
 {
@@ -1406,29 +1465,7 @@ void Recv::putbyte(unsigned char b)
 	txbuf.insert(c);
 }
 
-int Recv::_inbyte(int timeout)
-{
-	int c = -1;
-	for (int count = timeout/10; count > 0 && ((c = getbyte()) == -1); count--)
-	{
-		Sleep(10);
-	}
-	return c;
-}
-
-void Recv::_outbyte(unsigned char b)
-{
-	putbyte(b);
-	Sleep(1);
-}
-
-void Recv::_flushinput(void)
-{
-	while (_inbyte(((DLY_1S) * 3) >> 1) >= 0)
-		;
-}
-
-int Recv::Process(unsigned char *dest, int destsz)
+int Recv::Process(void)
 {
 	unsigned char xbuff[1030]; /* 1024 for XModem 1k + 3 head chars + 2 crc + nul */
 	unsigned char *p;
@@ -1442,8 +1479,10 @@ int Recv::Process(unsigned char *dest, int destsz)
 	{
 		for (retry = 0; retry < 16; ++retry)
 		{
-			if (trychar) 
+			if (trychar)
+			{
 				_outbyte(trychar);
+			}
 			if ((c = _inbyte((DLY_1S) << 1)) >= 0)
 			{
 				switch(c)
@@ -1458,6 +1497,7 @@ int Recv::Process(unsigned char *dest, int destsz)
 					_flushinput();
 					_outbyte(ACK);
 					TRACE("%s: ACK\n", getname());
+					TRACE("%s: file size=%d\n", getname(), bf->Filesize());
 					return len; /* normal end */
 				case CAN:
 					if ((c = _inbyte(DLY_1S)) == CAN)
@@ -1465,7 +1505,7 @@ int Recv::Process(unsigned char *dest, int destsz)
 						_flushinput();
 						_outbyte(ACK);
 						TRACE("%s: ACK\n", getname());
-						return -1; /* canceled by remote */
+						return -1; /* cancelled by remote */
 					}
 					break;
 				default:
@@ -1488,14 +1528,18 @@ int Recv::Process(unsigned char *dest, int destsz)
 	start_recv:
 		TRACE("%s: bufsz=%d\n", getname(), bufsz);
 		if (trychar == 'C')
+		{
 			crc = 1;
+		}
 		trychar = 0;
 		p = xbuff;
 		*p++ = c;
 		for (i = 0; i < (bufsz + (crc ? 1 : 0) + 3); ++i)
 		{
 			if ((c = _inbyte(DLY_1S)) < 0)
+			{
 				goto reject;
+			}
 			*p++ = c;
 		}
 
@@ -1505,16 +1549,11 @@ int Recv::Process(unsigned char *dest, int destsz)
 		{
 			if (xbuff[1] == packetno)
 			{
-				register int count = destsz - len;
-				if (count > bufsz)
-					count = bufsz;
-				if (count > 0)
-				{
-					memcpy(&dest[len], &xbuff[3], count);
-					len += count;
-					TRACE("%s: PACKET\n", getname());
-					MEM_Dump(xbuff, count, len);
-				}
+				TRACE("%s: PACKET\n", getname());
+				MEM_Dump(xbuff, bufsz, len);
+				/*TODO: Handle write errors. */
+				bf->WritetoFile((DWORD)bufsz, (BYTE *)&xbuff[3]);
+				len += bufsz;
 				++packetno;
 				retrans = MAXRETRANS + 1;
 			}
@@ -1538,119 +1577,26 @@ int Recv::Process(unsigned char *dest, int destsz)
 	}
 }
 
-
-class Send : public ActiveObject
+class Send : public XModem
 {
 public:
-	int Result;
-	Event e;
-	BASEFILE bf;
-
-	Send()
-	{
-		TRACE("%s()\n", getname());
-	}
-
-	Send(char *filename)
+	Send(char *filename) : XModem()
 	{
 		TRACE("%s(%s)\n", getname(), filename);
-		bf.InitReadFile(filename);
+		bf = new BASEFILE(true, filename);
 	}
 
 	~Send()
 	{
 		TRACE("~%s()\n", getname());
+		delete bf;
 	}
 
 	char *getname() { return "Send"; }
-
-	int Begin(void)
-	{
-		/* Determine the size of the image file. */
-		if (!bf.IsFile())
-		{
-			printf("%s: file not found!\n", getname());
-			Result = MDM_FILE_NOT_FOUND;
-		}
-		else
-		{
-			long size = bf.Filesize();
-			printf("%s: file size=%08x bytes\n", getname(), size);
-			Result = MDM_PROCESSING;
-
-			/* Run thread. */
-			Resume();
-		}
-		return Result;
-	}
-
-	int GetResult() { return Result; }
-	int WaitResult() { e.Wait(); return GetResult(); }
-
 	int getbyte(void);
 	void putbyte(unsigned char b);
-	int _inbyte(int timeout);
-	void _outbyte(unsigned char b);
-	void _flushinput(void);
-	int Process(unsigned char *dest, int destsz);
-
-private:
-	void InitThread() { }
-	void Run();
-	void FlushThread() { e.Release(); }
+	int Process(void);
 };
-
-void Send::Run()
-{
-	BOOL bSuccess = true;
-	/* Define a processing timer. */
-	Tmr tmr = TMR_New();
-	int Timeout = TMR_TIMEOUT_MAX;
-	TMR_Start(tmr, Timeout);
-	printf("%s: Run\n", getname());
-
-	while (bSuccess)
-	{
-		if (log)
-		{
-			log->Flush();
-		}
-		if (_isDying)
-		{
-			printf("%s: Aborted!\n", getname());
-			Result = MDM_ABORTED;
-			break;
-		}
-		long size;
-#if 0
-		size = bufsize;
-		unsigned char *bufptr = (unsigned char *)malloc(size);
-		memset(bufptr, 0xFF, size);
-#else
-		size = bf.Filesize();
-		unsigned char *bufptr = (unsigned char *)malloc(size);
-		bf.ReadfromFile((DWORD)size, (BYTE *)bufptr);
-#endif
-		int st = Process(bufptr, size);
-		if (st < 0)
-		{
-			printf("%s: Failure, status=%d\n", getname(), st);
-			Result = MDM_ERROR;
-			bSuccess = false;
-		}
-		else
-		{
-			printf("%s: Success, %d bytes\n", getname(), st);
-			Result = MDM_SUCCESS;
-			bSuccess = false;
-		}
-	}
-
-	printf("%s: Run rc=%d\n", getname(), Result);
-	TMR_Stop(tmr);
-	TMR_Delete(tmr);
-	e.Release();
-}
 
 int Send::getbyte(void)
 {
@@ -1668,35 +1614,15 @@ void Send::putbyte(unsigned char b)
 	rxbuf.insert(c);
 }
 
-int Send::_inbyte(int timeout)
-{
-	int c = -1;
-	for (int count = timeout/10; count > 0 && ((c = getbyte()) == -1); count--)
-	{
-		Sleep(10);
-	}
-	return c;
-}
-
-void Send::_outbyte(unsigned char b)
-{
-	putbyte(b);
-	Sleep(1);
-}
-
-void Send::_flushinput(void)
-{
-	while (_inbyte(((DLY_1S) * 3) >> 1) >= 0)
-		;
-}
-
-int Send::Process(unsigned char *src, int srcsz)
+int Send::Process(void)
 {
 	unsigned char xbuff[1030]; /* 1024 for XModem 1k + 3 head chars + 2 crc + nul */
 	int bufsz, crc = -1;
 	unsigned char packetno = 1;
 	int i, c, len = 0;
 	int retry;
+	long fsize = bf->Filesize();
+	TRACE("%s: file size=%d\n", getname(), fsize);
 
 	for (;;)
 	{
@@ -1741,19 +1667,21 @@ int Send::Process(unsigned char *src, int srcsz)
 #endif
 			xbuff[1] = packetno;
 			xbuff[2] = ~packetno;
-			c = srcsz - len;
+			c = fsize - len;
 			if (c > bufsz)
+			{
 				c = bufsz;
+			}
 			if (c > 0)
 			{
 				memset(&xbuff[3], 0, bufsz);
-#if 1
-				memcpy(&xbuff[3], &src[len], c);
-#else
-				bf.ReadfromFile((DWORD)c, (BYTE *)&xbuff[3]);
-#endif
+				/*TODO: Handle Read errors. */
+				bf->ReadfromFile((DWORD)c, (BYTE *)&xbuff[3]);
 				if (c < bufsz)
+				{
+					/* NOTE mark the end of a text file with '1A'. */
 					xbuff[3 + c] = SUB;
+				}
 				if (crc)
 				{
 					unsigned short ccrc = crc16_ccitt(&xbuff[3], bufsz);
@@ -1809,10 +1737,16 @@ int Send::Process(unsigned char *src, int srcsz)
 				{
 					_outbyte(EOT);
 					if ((c = _inbyte((DLY_1S) << 1)) == ACK)
+					{
 						break;
+					}
 				}
 				_flushinput();
-				return (c == ACK)? len : -5;
+				if (c == ACK)
+				{
+					return len; /* normal end */
+				}
+				return -5;
 			}
 		}
 	}
@@ -1830,15 +1764,19 @@ int main(int argc, char *argv[])
 	TMR_Init(100);	// 100ms timebase
 
 	/* Initialize the Recv & Send threads. */
-	Recv *recv = new Recv();
-	Send *send = new Send("C:\\temp\\cfg.spt");
+	Recv *recv = new Recv("C:\\temp\\recv.txt");
+	Send *send = new Send("C:\\temp\\send.txt");
 
 	/* Begin execution of processing. */
-	recv->Begin();
-	Sleep(100);
-	send->Begin();
-	send->WaitResult();
-	recv->WaitResult();
+	if (recv->Begin() == MDM_PROCESSING)
+	{
+		Sleep(200);
+		if (send->Begin() == MDM_PROCESSING)
+		{
+			send->WaitResult();
+			recv->WaitResult();
+		}
+	}
 
 	/* Terminate the Recv & Send thread. */
 	delete send;
