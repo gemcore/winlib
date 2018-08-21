@@ -21,9 +21,6 @@
 #include <stdio.h>                  /* C Standard I/O definitions */
 #include <stdarg.h>                 /* C ANSI standard variable args macros */
 #include "syserr.h"
-#include "thread.h"
-
-static Mutex  mutex;
 
 /*==========================================================================
 |
@@ -57,8 +54,6 @@ void LOG::PutChar(int c)
 
 void LOG::PutStr(char *s)
 {
-	Lock lock(mutex);
-
 	/* Output a string. */
 	while (*s)
 	{
