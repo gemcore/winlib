@@ -1492,10 +1492,9 @@ int Recv::Process(void)
 			if (trychar)
 			{
 				if (trychar == 'C')
-					TRACERECV("%s: >C\n", getname());
+					TRACERECV("%s: >'C'\n", getname());
 				else
 					TRACERECV("%s: >NAK\n", getname());
-				Sleep(100);
 				txbyte(trychar);
 			}
 			if ((c = rxbyte((DLY_1S) << 1)) >= 0)
@@ -1510,7 +1509,6 @@ int Recv::Process(void)
 					goto start_recv;
 				case EOT:
 					rxflush();
-					Sleep(100);
 					TRACERECV("%s: <EOT\n", getname());
 					txbyte(ACK);
 					TRACERECV("%s: >ACK\n", getname());
@@ -1588,9 +1586,7 @@ int Recv::Process(void)
 				TRACERECV("%s: >CAN\n", getname());
 				return -3; /* too many retry error */
 			}
-			Sleep(100);
 			TRACERECV("%s: >ACK\n", getname());
-			Sleep(100);
 			txbyte(ACK);
 			continue;
 		}
@@ -1656,7 +1652,7 @@ int Send::Process(void)
 				switch(c)
 				{
 				case 'C':
-					TRACESEND("%s: <C\n", getname());
+					TRACESEND("%s: <'C'\n", getname());
 					crc = 1;
 					goto start_trans;
 				case NAK:
@@ -1731,7 +1727,6 @@ int Send::Process(void)
 				for (retry = 0; retry < MAXRETRANS; ++retry)
 				{
 					TRACESEND("%s: >PACKET\n", getname());
-					Sleep(200);
 					for (i = 0; i < bufsz + 4 + (crc ? 1 : 0); ++i)
 					{
 						txbyte(xbuff[i]);
