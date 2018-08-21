@@ -1302,9 +1302,6 @@ static int check(int crc, const unsigned char *buf, int sz)
 #define MDM_TIMEOUT         -5
 #define MDM_ABORTED        -12
 
-#define TRACERECV(fmt,...)	printf(fmt,__VA_ARGS__)
-#define TRACESEND(fmt,...)	printf(fmt,__VA_ARGS__)
-
 class Recv;
 class Send;
 
@@ -1426,13 +1423,15 @@ int XModem::rxbyte(int timeout)
 void XModem::txbyte(unsigned char b)
 {
 	putbyte(b);
-	Sleep(1);
 }
 
 void XModem::rxflush(void)
 {
-	while (rxbyte(((DLY_1S) * 3) >> 1) >= 0)
-		;
+	int c;
+	while ((c = rxbyte(((DLY_1S) * 3) >> 1)) >= 0)
+	{
+		TRACE("%s: <[%02x]\n", getname(), c);
+	}
 }
 
 /* Circular rx/tx buffers for 'communicating' between the Recv and Send threads. */
@@ -1476,13 +1475,57 @@ void Recv::putbyte(unsigned char b)
 	txbuf.insert(c);
 }
 
+static Mutex  dump_mutex;
+
+void Packet_Dump(char *name, char *str, unsigned char *data, int len, long base)
+{
+	Lock lock(dump_mutex);
+
+	int i, j;
+
+	printf("%s: %s @%08x len=%04x\n", name, str, data, len);
+	for (i = 0; i < len; i += 16)
+	{
+		printf(" %06x: ", base + i);
+		for (j = 0; j < 16; j++)
+		{
+			if (j != 0)
+			{
+				if (!(j % 8))
+					putchar(' ');
+				if (!(j % 1))
+					putchar(' ');
+			}
+			if ((i + j) < len)
+				printf("%02x", data[i + j]);
+			else
+				printf("  ");
+		}
+		printf("  ");
+		for (j = 0; j < 16 && (i + j) < len; j++)
+		{
+			if ((i + j) < len)
+			{
+				int c = data[i + j] & 0xFF;
+				if (isprint(c))
+					putchar(c);
+				else
+					putchar('.');
+			}
+			else
+				putchar(' ');
+		}
+		putchar('\n');
+	}
+}
+
 int Recv::Process(void)
 {
 	unsigned char *p;
 	int bufsz, crc = 0;
 	unsigned char trychar = 'C';
 	unsigned char packetno = 1;
-	int i, c, len = 0;
+	int i, c, bufpos = 0;
 	int retry, retrans = MAXRETRANS;
 
 	for (;;)
@@ -1492,10 +1535,9 @@ int Recv::Process(void)
 			if (trychar)
 			{
 				if (trychar == 'C')
-					TRACERECV("%s: >C\n", getname());
+					TRACE("%s: >'C'\n", getname());
 				else
-					TRACERECV("%s: >NAK\n", getname());
-				Sleep(100);
+					TRACE("%s: >NAK\n", getname());
 				txbyte(trychar);
 			}
 			if ((c = rxbyte((DLY_1S) << 1)) >= 0)
@@ -1509,26 +1551,29 @@ int Recv::Process(void)
 					bufsz = 1024;
 					goto start_recv;
 				case EOT:
-					rxflush();
-					Sleep(100);
-					TRACERECV("%s: <EOT\n", getname());
+					TRACE("%s: <EOT\n", getname());
+					//rxflush();	//TODO: ADG! Why flush here?
 					txbyte(ACK);
-					TRACERECV("%s: >ACK\n", getname());
+					TRACE("%s: >ACK\n", getname());
 					TRACE("%s: file size=%d\n", getname(), bf->Filesize());
-					return len; /* normal end */
+					return bufpos; /* normal end */
 				case CAN:
 					if ((c = rxbyte(DLY_1S)) == CAN)
 					{
-						rxflush();
+						//rxflush();	//TODO: ADG! Why flush here?
 						txbyte(ACK);
-						TRACERECV("%s: >ACK\n", getname());
+						TRACE("%s: >ACK\n", getname());
 						return -1; /* cancelled by remote */
 					}
 					break;
 				default:
-					TRACERECV("%s: <[%02x]\n", getname(), c);
+					TRACE("%s: <[%02x]\n", getname(), c);
 					break;
 				}
+			}
+			else
+			{
+				TRACE("%s: timeout!\n", getname());
 			}
 		}
 		if (trychar == 'C')
@@ -1536,13 +1581,13 @@ int Recv::Process(void)
 			trychar = NAK; 
 			continue;
 		}
-		rxflush();
+		//rxflush();	//TODO: ADG! Why flush here?
 		txbyte(CAN);
-		TRACERECV("%s: >CAN\n", getname());
+		TRACE("%s: >CAN\n", getname());
 		txbyte(CAN);
-		TRACERECV("%s: >CAN\n", getname());
+		TRACE("%s: >CAN\n", getname());
 		txbyte(CAN);
-		TRACERECV("%s: >CAN\n", getname());
+		TRACE("%s: >CAN\n", getname());
 		return -2; /* sync error */
 
 	start_recv:
@@ -1554,7 +1599,7 @@ int Recv::Process(void)
 		trychar = 0;
 		p = xbuff;
 		*p++ = c;
-		for (i = 0; i < (bufsz + (crc ? 1 : 0) + 3); ++i)
+		for (i = 0; i < (bufsz + 3 + (crc ? 1 : 0)); ++i)
 		{
 			if ((c = rxbyte(DLY_1S)) < 0)
 			{
@@ -1569,35 +1614,32 @@ int Recv::Process(void)
 		{
 			if (xbuff[1] == packetno)
 			{
-				TRACERECV("%s: <PACKET\n", getname());
-				//MEM_Dump(xbuff, bufsz, len);
+				Packet_Dump(getname(), "<PACKET", xbuff, bufsz + 4 + (crc ? 1 : 0), bufpos);
 				/*TODO: Handle write errors. */
 				bf->WritetoFile((DWORD)bufsz, (BYTE *)&xbuff[3]);
-				len += bufsz;
+				bufpos += bufsz;
 				++packetno;
 				retrans = MAXRETRANS + 1;
 			}
 			if (--retrans <= 0)
 			{
-				rxflush();
+				//rxflush();	//TODO: ADG! Why flush here?
 				txbyte(CAN);
-				TRACERECV("%s: >CAN\n", getname());
+				TRACE("%s: >CAN\n", getname());
 				txbyte(CAN);
-				TRACERECV("%s: >CAN\n", getname());
+				TRACE("%s: >CAN\n", getname());
 				txbyte(CAN);
-				TRACERECV("%s: >CAN\n", getname());
+				TRACE("%s: >CAN\n", getname());
 				return -3; /* too many retry error */
 			}
-			Sleep(100);
-			TRACERECV("%s: >ACK\n", getname());
-			Sleep(100);
+			TRACE("%s: >ACK\n", getname());
 			txbyte(ACK);
 			continue;
 		}
 	reject:
 		rxflush();
 		txbyte(NAK);
-		TRACERECV("%s: >NAK\n", getname());
+		TRACE("%s: >NAK\n", getname());
 	}
 }
 
@@ -1642,7 +1684,7 @@ int Send::Process(void)
 {
 	int bufsz, crc = -1;
 	unsigned char packetno = 1;
-	int i, c, len = 0;
+	int i, c, bufpos = 0;
 	int retry;
 	long fsize = bf->Filesize();
 	TRACE("%s: file size=%d\n", getname(), fsize);
@@ -1656,36 +1698,36 @@ int Send::Process(void)
 				switch(c)
 				{
 				case 'C':
-					TRACESEND("%s: <C\n", getname());
+					TRACE("%s: <'C'\n", getname());
 					crc = 1;
 					goto start_trans;
 				case NAK:
-					TRACESEND("%s: <NAK\n", getname());
+					TRACE("%s: <NAK\n", getname());
 					crc = 0;
 					goto start_trans;
 				case CAN:
 					if ((c = rxbyte(DLY_1S)) == CAN)
 					{
-						TRACESEND("%s: <CAN\n", getname());
+						TRACE("%s: <CAN\n", getname());
 						txbyte(ACK);
-						TRACESEND("%s: >ACK\n", getname());
-						rxflush();
+						TRACE("%s: >ACK\n", getname());
+						//rxflush();	//TODO: ADG! Why flush here?
 						return -1; /* canceled by remote */
 					}
 					break;
 				default:
-					TRACESEND("%s: <[%02x]\n", getname(), c);
+					TRACE("%s: <[%02x]\n", getname(), c);
 					break;
 				}
 			}
 		}
 		txbyte(CAN);
-		TRACESEND("%s: >CAN\n", getname());
+		TRACE("%s: >CAN\n", getname());
 		txbyte(CAN);
-		TRACESEND("%s: >CAN\n", getname());
+		TRACE("%s: >CAN\n", getname());
 		txbyte(CAN);
-		TRACESEND("%s: >CAN\n", getname());
-		rxflush();
+		TRACE("%s: >CAN\n", getname());
+		//rxflush();	//TODO: ADG! Why flush here?
 		return -2; /* no sync */
 
 		for (;;)
@@ -1698,7 +1740,7 @@ int Send::Process(void)
 #endif
 			xbuff[1] = packetno;
 			xbuff[2] = ~packetno;
-			c = fsize - len;
+			c = fsize - bufpos;
 			if (c > bufsz)
 			{
 				c = bufsz;
@@ -1730,8 +1772,7 @@ int Send::Process(void)
 				}
 				for (retry = 0; retry < MAXRETRANS; ++retry)
 				{
-					TRACESEND("%s: >PACKET\n", getname());
-					Sleep(200);
+					Packet_Dump(getname(), ">PACKET", xbuff, bufsz + 4 + (crc ? 1 : 0), 0);
 					for (i = 0; i < bufsz + 4 + (crc ? 1 : 0); ++i)
 					{
 						txbyte(xbuff[i]);
@@ -1741,30 +1782,31 @@ int Send::Process(void)
 						switch(c)
 						{
 						case ACK:
-							TRACESEND("%s: <ACK\n", getname());
+							TRACE("%s: <ACK\n", getname());
 							++packetno;
-							len += bufsz;
+							bufpos += bufsz;
 							goto start_trans;
 						case CAN:
-							TRACESEND("%s: <CAN\n", getname());
+							TRACE("%s: <CAN\n", getname());
 							txbyte(ACK);
-							TRACESEND("%s: >ACK\n", getname());
-							rxflush();
+							TRACE("%s: >ACK\n", getname());
+							//rxflush();	//TODO: ADG! Why flush here?
 							return -1; /* canceled by remote */
 						case NAK:
-							TRACESEND("%s: <NAK\n", getname());
+							TRACE("%s: <NAK\n", getname());
+							break; 
 						default:
-							TRACESEND("%s: <[%02x]\n", getname(), c);
+							TRACE("%s: <[%02x]\n", getname(), c);
 							break;
 						}
 					}
 				}
 				txbyte(CAN);
-				TRACESEND("%s: >CAN\n", getname());
+				TRACE("%s: >CAN\n", getname());
 				txbyte(CAN);
-				TRACESEND("%s: >CAN\n", getname());
+				TRACE("%s: >CAN\n", getname());
 				txbyte(CAN);
-				TRACESEND("%s: >CAN\n", getname());
+				TRACE("%s: >CAN\n", getname());
 				rxflush();
 				return -4; /* xmit error */
 			}
@@ -1773,20 +1815,22 @@ int Send::Process(void)
 				for (retry = 0; retry < 10; ++retry)
 				{
 					txbyte(EOT);
-					TRACESEND("%s: >EOT\n", getname());
+					TRACE("%s: >EOT\n", getname());
 					c = rxbyte((DLY_1S) << 1);
-					if (c == ACK)
+					if (c >= 0)
 					{
-						break;
+						if (c == ACK)
+						{
+							TRACE("%s: <ACK\n", getname());
+							return bufpos; /* normal end */
+						}
+						else
+						{
+							TRACE("%s: <[%02x]\n", getname(), c);
+						}
 					}
-					TRACESEND("%s: <[%02x]\n", getname(), c);
 				}
-				rxflush();
-				if (c == ACK)
-				{
-					TRACESEND("%s: <ACK\n", getname());
-					return len; /* normal end */
-				}
+				//rxflush();	//TODO: ADG! Why flush here?
 				return -5;
 			}
 		}
@@ -1803,26 +1847,30 @@ int main(int argc, char *argv[])
 	LOG_Init("c:\\temp\\winlib.log");
 
 	TMR_Init(100);	// 100ms timebase
+	COM_Init(3, 115200);
 
 	/* Initialize the Recv & Send threads. */
 	Recv *recv = new Recv("C:\\temp\\recv.txt");
 	Send *send = new Send("C:\\temp\\send.txt");
-
 	/* Begin execution of processing. */
-	if (recv->Begin() == MDM_PROCESSING)
+	if (send->Begin() == MDM_PROCESSING)
 	{
-		Sleep(200);
-		if (send->Begin() == MDM_PROCESSING)
+		Sleep(100);
+
+		if (recv->Begin() == MDM_PROCESSING)
 		{
-			send->WaitResult();
 			recv->WaitResult();
+			send->WaitResult();
 		}
 	}
+	recv->rxflush();
+	send->rxflush();
 
 	/* Terminate the Recv & Send thread. */
 	delete send;
 	delete recv;
 
+	COM_Term();
 	TMR_Term();
 
 	// Close capture log file.
