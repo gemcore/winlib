@@ -27,7 +27,8 @@
 //#define COM_TESTING
 //#define TMR_TESTING
 //#define MDM_TESTING
-#define ZAR_TESTING
+//#define ZAR_TESTING
+#define LUA_TESTING
 
 /* xScript Rx initial timeout maximum value. */
 #define TMR_TIMEOUT_MAX	32000
@@ -1961,6 +1962,49 @@ int _main(int argc, char *argv[])
 	}
 
 	int rc = Cmd_zar(argc, argv);
+
+	// Close capture log file.
+	LOG_Term();
+
+	return rc;
+}
+
+int main(int argc, char *argv[])
+{
+#if 0
+	argv[0] = "zar";
+	argv[1] = "-c";
+	argv[2] = "*.txt";
+	argv[3] = "-zc:\\temp\\zar.zar";
+	argc = 4;
+#else
+	argv[0] = "zar";
+	argc = 1;
+#endif
+	return _main(argc, argv);
+}
+#endif
+
+#ifdef LUA_TESTING
+extern "C"
+{
+#include "src\lua\lua.h"
+//extern lua_main(int argc, char *argv[]);
+//extern luac_main(ing argc, char *argv[]);
+}
+
+int _main(int argc, char *argv[])
+{
+	// Open log file to capture output from putchar, puts and printf macros.
+	LOG_Init("c:\\temp\\winlib.log");
+
+	printf("argc=%d\n", argc);
+	for (int i = 0; i < argc; i++)
+	{
+		printf("argv[%d]='%s'\n", i, argv[i]);
+	}
+	int rc = lua_main(argc, argv);	// lua interpreter
+//	int rc = luac_main(argc, argv);	// lua compiler
 
 	// Close capture log file.
 	LOG_Term();
