@@ -26,7 +26,8 @@
 //#define RUN_TESTING
 //#define COM_TESTING
 //#define TMR_TESTING
-#define MDM_TESTING
+//#define MDM_TESTING
+#define FTL_TESTING
 
 /* xScript Rx initial timeout maximum value. */
 #define TMR_TIMEOUT_MAX	32000
@@ -1943,4 +1944,24 @@ int main(int argc, char *argv[])
 	
 	return 0;
 }
+#endif
+
+#ifdef FTL_TESTING
+char qflag = 0;  						// quiet mode off (output to window)
+
+extern "C" int main_nand(void);
+
+int main(int argc, char *argv[])
+{
+	// Capture output from putchar, puts and printf macros.
+	LOG_Init(NULL);
+	printf("\ntesting ");
+
+	main_nand();
+
+	// Close capture log file.
+	LOG_Term();
+	return 0;
+}
+
 #endif
