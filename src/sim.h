@@ -19,16 +19,16 @@
 
 #include "dhara/nand.h"
 
-#if 0
-#define LOG2_PAGE_SIZE		9
-#define LOG2_PAGES_PER_BLOCK	3
+#if 1
+#define LOG2_PAGE_SIZE		8
+#define LOG2_PAGES_PER_BLOCK	4
 #define LOG2_BLOCK_SIZE		(LOG2_PAGE_SIZE + LOG2_PAGES_PER_BLOCK)
-#define NUM_BLOCKS		113
+#define NUM_BLOCKS		32
 #else
 #define LOG2_PAGE_SIZE		9       // 512 bytes
 #define LOG2_PAGES_PER_BLOCK	3       // 8 pages per block
 #define LOG2_BLOCK_SIZE		(LOG2_PAGE_SIZE + LOG2_PAGES_PER_BLOCK)
-#define NUM_BLOCKS		25
+#define NUM_BLOCKS		32
 #endif
 
 /* Simulated NAND layer. This layer reads and writes to an in-memory

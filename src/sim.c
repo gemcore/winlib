@@ -200,6 +200,7 @@ int dhara_nand_prog(const struct dhara_nand *n, dhara_page_t p,
 		return -1;
 	}
 
+	printf("sim: NAND_prog: page=%2d\n", p);
 	memcpy(page, data, PAGE_SIZE);
 	return 0;
 }
@@ -246,6 +247,7 @@ int dhara_nand_read(const struct dhara_nand *n, dhara_page_t p,
 		stats.read_bytes += length;
 	}
 
+	printf("sim: NAND_read: page=%2d offset=%3d length=%d\n", p, offset, length);
 	memcpy(data, page + offset, length);
 	return 0;
 }

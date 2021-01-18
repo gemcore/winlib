@@ -24,7 +24,7 @@
 
 #define TRACE   printf
 
-#define NUM_SECTORS		5
+#define NUM_SECTORS		10
 #define GC_RATIO		4
 
 static dhara_sector_t sector_list[NUM_SECTORS];
@@ -98,7 +98,7 @@ static void mt_check(struct dhara_map *m)
 {
 	int count;
 
-        TRACE("mt_check\n");
+    //TRACE("mt_check\n");
 	sim_freeze();
 	count = check_recurse(m, m->journal.head,
 		dhara_journal_root(&m->journal), 0, 0);
@@ -112,10 +112,11 @@ static uint8_t buf[1<<LOG2_PAGE_SIZE];
 static void mt_write(struct dhara_map *m, dhara_sector_t s, int seed)
 {
 	//const size_t page_size = 1 << m->journal.nand->log2_page_size;
-        //uint8_t buf[page_size];
+    //uint8_t buf[page_size];
 	dhara_error_t err;
 
-        TRACE("mt_write s=%02d buf=%x\r\n",s,buf);
+    
+	TRACE("mt_write s=%02d\r\n",s);
 	seq_gen(seed, buf, sizeof(buf));
 	if (dhara_map_write(m, s, buf, &err) < 0)
 		dabort("map_write", err);
@@ -124,10 +125,10 @@ static void mt_write(struct dhara_map *m, dhara_sector_t s, int seed)
 static void mt_assert(struct dhara_map *m, dhara_sector_t s, int seed)
 {
 	//const size_t page_size = 1 << m->journal.nand->log2_page_size;
-        //uint8_t buf[page_size];
+    //uint8_t buf[page_size];
 	dhara_error_t err;
 
-        TRACE("mt_assert s=%02d buf=%x\r\n",s,buf);
+    //TRACE("mt_assert s=%02d buf=%x\r\n",s,buf);
 	if (dhara_map_read(m, s, buf, &err) < 0)
 		dabort("map_read", err);
 
@@ -138,7 +139,7 @@ static void mt_trim(struct dhara_map *m, dhara_sector_t s)
 {
 	dhara_error_t err;
 
-        TRACE("mt_trim s=%02d\r\n",s);
+    //TRACE("mt_trim s=%02d\r\n",s);
 	if (dhara_map_trim(m, s, &err) < 0)
 		dabort("map_trim", err);
 }
@@ -150,7 +151,7 @@ static void mt_assert_blank(struct dhara_map *m, dhara_sector_t s)
 	int r;
 
 	r = dhara_map_find(m, s, &loc, &err);
-        TRACE("mt_assert_blank r=%02d s=%02d loc=%x\r\n",r,s,loc);
+    //TRACE("mt_assert_blank r=%02d s=%02d loc=%x\r\n",r,s,loc);
 	assert(r < 0);
 	assert(err == DHARA_E_NOT_FOUND);
 }
