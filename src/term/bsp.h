@@ -15,7 +15,7 @@ extern "C" {
 //#define HAS_OLED		1   // has a graphics OLED display
 //#define HAS_LED		1   // has a heartbeat LED like on the DK-TM4C123G board
 //#define HAS_MDM       1   // has serial XMODEM file transfer code (experimental)
-//#define HAS_PTS       1   // has Protothreads
+#define HAS_PTS       1   // has Protothreads
 //#define HAS_BUZ       1   // has a PWM buzzer output driven by Timer0
 //#define HAS_BTN       1   // has a user push button
 //#define HAS_WDT		1	// has Watchdog timer enabled
@@ -25,7 +25,10 @@ extern "C" {
 //#define HAS_USB		1	// has USB
 //#define HAS_TMRS      1   // has Application Timer callbacks (experimental)
 //#define HAS_LFS       1   // has Little File System
-//#define HAS_LOG       1   // has system logging
+#define HAS_LOG       1   // has system logging
+#define HAS_CLI       1   // Console handling
+#define HAS_EVT       1   // Event handling
+#define HAS_TRM       1   // ANSI terminal
 
 #define	SYSTICK_RATE_HZ			100
 
@@ -47,6 +50,8 @@ extern "C" {
 
 #define byte		uint8_t
 #define word		uint16_t
+
+extern void SysTickIntHandler(void);
 
 int BSP_Init(void);
 uint8_t BSP_claim_msec_cnt(void);

@@ -355,7 +355,6 @@ bool CFG_Load(void)
 #endif
 }
 
-#if 0
 static void usage(void)
 {
     CON_printf("load  : load configuration\n");
@@ -702,4 +701,3 @@ int Cmd_cfg(int argc, char *argv[])
     }
     return(0);
 }
-#endif

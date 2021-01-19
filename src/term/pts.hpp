@@ -256,6 +256,7 @@ void PTS_ResumeTask(uint8_t id);
 void PTS_KillTask(uint8_t id);
 uint8_t PTS_GetCurTaskId(void);
 Tcb *PTS_GetCurTask(void);
+uint8_t PTS_GetTaskCnt(void);
 Tcb *PTS_GetTask(uint8_t id);
 PTS_Thread *PTS_GetThread(uint8_t id);
 void PTS_RestartCurTask(void);

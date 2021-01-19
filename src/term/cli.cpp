@@ -4,23 +4,15 @@
  *  Created on: Oct 26, 2017
  *      Author: Alan
  */
-#ifdef WIN32
-extern "C"
-{
-	void CLI_SetEnable(bool state)
-	{		
-	}
 
-	int CLI_GetId(void)
-	{
-		return 0;
-	}
-}
-
-#else
 #include <string.h>
 #include <errno.h>
+#ifndef WIN32
 #include "ustdlib.h"
+#else
+#include <stdio.h>
+#include <stdlib.h>
+#endif
 #include "cli.h"            // Console handling
 #if HAS_EVT == 1
 #include "evt.h"            // event handling
@@ -126,6 +118,7 @@ const rResultString g_psResultString[] =
     // (+) 100
     RESULT_ENTRY(SPT_PROCESSING),
 #endif
+#if HAS_LFS == 1
     // (-) 001 - 099  (currently used by LFS)
     RESULT_ENTRY(ERR_EIO),
     RESULT_ENTRY(ERR_EFAULT),
@@ -141,6 +134,7 @@ const rResultString g_psResultString[] =
     RESULT_ENTRY(ERR_ENOMEM),
     RESULT_ENTRY(ERR_ENODATA),
     RESULT_ENTRY(ERR_ENAMETOOLONG),
+#endif
 /*
     RESULT_ENTRY(ERR_EDOM),
     RESULT_ENTRY(ERR_EFPOS),
@@ -689,7 +683,7 @@ void CLI_Prompt(bool state)
         static char prompt[PATH_BUF_SIZE];
         sprintf(prompt, "%s%s", g_pcCwd, CLI_PROMPT);
 #else
-        static char *prompt = cli_prompt;
+        static char *prompt = CLI_PROMPT;
 #endif
         cli_pt->setprompt(prompt);
     }
@@ -948,4 +942,3 @@ int Cmd_cli(int argc, char *argv[])
 }
 
 }
-#endif

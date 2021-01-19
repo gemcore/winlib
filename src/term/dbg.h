@@ -31,6 +31,10 @@ void CON_ungetc(char c);
 void CON_printf(const char *format, ...);
 void CON_trace(const char *pcFormat, ...);
 void CON_Flush(void);
+void CON_EchoSet(bool state);
+bool CON_EchoGet(void);
+void CON_NLSet(bool state);
+bool CON_NLGet(void);
 
 #ifdef    __cplusplus
 }

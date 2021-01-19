@@ -19,6 +19,9 @@
     <Filter Include="Source Files\tests">
       <UniqueIdentifier>{9e42d048-3fd8-4e7b-9e7a-c639634d8cb4}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\term">
+      <UniqueIdentifier>{b8ab706b-5d4d-44c0-9ed4-301b085a9fe8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -99,6 +102,45 @@
     <ClInclude Include="src\util.h">
       <Filter>Source Files\tests</Filter>
     </ClInclude>
+    <ClInclude Include="src\MDM.H">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\term\term.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\term\type.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\term\platform_conf.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\term\pts.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\term\ringbuf.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\term\cli.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\term\evt.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\term\dbg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\term\cfg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\term\bsp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\term\history.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\term\linenoise.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -157,6 +199,42 @@
     </ClCompile>
     <ClCompile Include="src\main_nand.c">
       <Filter>Source Files\tests</Filter>
+    </ClCompile>
+    <ClCompile Include="src\term\bsp.c">
+      <Filter>Source Files\term</Filter>
+    </ClCompile>
+    <ClCompile Include="src\term\cfg.c">
+      <Filter>Source Files\term</Filter>
+    </ClCompile>
+    <ClCompile Include="src\term\cli.cpp">
+      <Filter>Source Files\term</Filter>
+    </ClCompile>
+    <ClCompile Include="src\term\dbg.c">
+      <Filter>Source Files\term</Filter>
+    </ClCompile>
+    <ClCompile Include="src\term\evt.cpp">
+      <Filter>Source Files\term</Filter>
+    </ClCompile>
+    <ClCompile Include="src\term\pts.cpp">
+      <Filter>Source Files\term</Filter>
+    </ClCompile>
+    <ClCompile Include="src\term\ringbuf.c">
+      <Filter>Source Files\term</Filter>
+    </ClCompile>
+    <ClCompile Include="src\term\ted.cpp">
+      <Filter>Source Files\term</Filter>
+    </ClCompile>
+    <ClCompile Include="src\term\trm.cpp">
+      <Filter>Source Files\term</Filter>
+    </ClCompile>
+    <ClCompile Include="src\term\term.c">
+      <Filter>Source Files\term</Filter>
+    </ClCompile>
+    <ClCompile Include="src\term\history.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\term\linenoise.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

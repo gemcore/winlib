@@ -36,9 +36,9 @@
 #include <stdarg.h>
 #include "BASEFILE.HPP"
 
-#define putchar(c)	      do{ if (log) log->PutChar(c); }while(0)
-#define puts(s)		      do{ if (log) log->PutStr(s); }while(0)
-#define printf(fmt, ...)  do{ if (log) log->Printf(fmt, __VA_ARGS__); }while(0)
+#define putchar(c)	      do{ if (logger) logger->Putchar(c); }while(0)
+#define puts(s)		      do{ if (logger) logger->Puts(s); }while(0)
+#define printf(fmt, ...)  do{ if (logger) logger->Printf(fmt, __VA_ARGS__); }while(0)
 
 #define TRACE(fmt, ...)   do{ if (!qflag) fprintf(stderr, fmt, __VA_ARGS__); }while(0)
 #define DEBUG(fmt, ...)   do{ if (!qflag) fprintf(stderr, fmt, __VA_ARGS__); }while(0)
@@ -58,22 +58,39 @@ public:
 	~LOG() { Flush(); }
    
    void Flush(void);
-   void PutChar(int c);
-   void PutStr(char *s);
+   void Putchar(int c);
+   void Puts(char *s);
    int Printf(const char *format,...);
    void Enable(bool flag) { bflag = flag; }
 };
 
 extern char qflag;
-extern LOG *log;
+extern LOG *logger;
 
-extern "C"
-{
-	void LOG_Init(char *filename);
-	void LOG_Term(void);
-	void LOG_Enable(bool flag);
-}
-
+#ifdef __cplusplus
+extern "C" {
 #endif
 
+//*****************************************************************************
+// API functions
+//*****************************************************************************
+
+void LOG_Init(char *filename);
+void LOG_Term(void);
+void LOG_Enable(bool flag);
+void LOG_Flush(void);
+void LOG_Putchar(char c);
+void LOG_Puts(char *s);
+void LOG_Printf(const char *format, ...);
+
+//*****************************************************************************
+// Definition of CLI commands
+//*****************************************************************************
+int Cmd_log(int argc, char *argv[]);
+
+#ifdef    __cplusplus
+}
+#endif
+
+#endif //#ifndef _LOG_H 
 

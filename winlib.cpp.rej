@@ -1,0 +1,43 @@
+diff a/winlib.cpp b/winlib.cpp	(rejected hunks)
+@@ -1945,3 +1945,41 @@
+ 	return 0;
+ }
+ #endif
++
++#ifdef ZAR_TESTING
++extern "C" int Cmd_zar(int argc, char *argv[]);
++
++int _main(int argc, char *argv[])
++{
++	// Open log file to capture output from putchar, puts and printf macros.
++	LOG_Init("c:\\temp\\winlib.log");
++
++	printf("argc=%d\n", argc);
++	for (int i = 0; i < argc; i++)
++	{
++		printf("argv[%d]='%s'\n", i, argv[i]);
++	}
++
++	int rc = Cmd_zar(argc, argv);
++
++	// Close capture log file.
++	LOG_Term();
++
++	return rc;
++}
++
++int main(int argc, char *argv[])
++{
++#if 0
++	argv[0] = "zar";
++	argv[1] = "-c";
++	argv[2] = "*.txt";
++	argv[3] = "-zc:\\temp\\zar.zar";
++	argc = 4;
++#else
++	argv[0] = "zar";
++	argc = 1;
++#endif
++	return _main(argc, argv);
++}
++#endif

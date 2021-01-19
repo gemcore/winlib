@@ -2106,8 +2106,6 @@ int CON_Init(void)
 		return -1;
 	}
 
-	int ch;
-
 	// Get Screen dimensions
 	CONSOLE_SCREEN_BUFFER_INFO ScreenBufferInfo;
 	GetConsoleScreenBufferInfo(hOut, &ScreenBufferInfo);
@@ -2116,6 +2114,8 @@ int CON_Init(void)
 	Size.Y = ScreenBufferInfo.srWindow.Bottom - ScreenBufferInfo.srWindow.Top + 1;
 
 #if 0
+	int ch;
+
 	// Enter the alternate buffer
 	printf(CSI "?1049h");
 
@@ -2302,14 +2302,107 @@ int CON_getc()
 }
 
 #include "src/term/bsp.h"
+#include "src/term/cfg.h"
 #include "src/term/term.h"
+#include "src/term/evt.h"
+#include "src/term/cli.h"
 #include "src/term/pts.hpp"
 
 extern void TRM_Init();
 extern void TRM_Term();
 extern int Cmd_ted(int argc, char *argv[]);
 
-extern void SysTickIntHandler(void);
+void MEM_Dump(uint8_t *data, uint16_t len, uint32_t base)
+{
+	uint16_t i, j;
+
+	//if (!CFG_IsTrace(DFLAG_TRC))
+	//	return;
+
+	//CON_printf("MEM: @%08x len=%04x\n",data,len);
+	for (i = 0; i < len; i += 16)
+	{
+		CON_printf(" %06x: ", base + i);
+		for (j = 0; j < 16; j++)
+		{
+			if (j != 0)
+			{
+				if (!(j % 8))
+					CON_printf(" ");
+				if (!(j % 1))
+					CON_printf(" ");
+			}
+			if ((i + j) < len)
+				CON_printf("%02x", data[i + j]);
+			else
+				CON_printf("  ");
+		}
+		CON_printf("  ");
+		for (j = 0; j < 16 && (i + j) < len; j++)
+		{
+			if ((i + j) < len)
+			{
+				if (isprint(data[i + j]))
+					CON_printf("%c", data[i + j]);
+				else
+					CON_printf(".");
+			}
+			else
+				CON_printf(" ");
+		}
+		CON_printf("\n");
+	}
+}
+
+//*****************************************************************************
+// This function implements the "help" command.  It prints a list of available
+// commands with a brief description.
+//*****************************************************************************
+int Cmd_help(int argc, char *argv[])
+{
+	SHELL_COMMAND *psEntry;
+
+	// Point at the beginning of the command table.
+	psEntry = &g_psShellCmds[0];
+
+	// Enter a loop to read each entry from the command table.  The end of the
+	// table has been reached when the command name is NULL.
+	while (psEntry->cmd)
+	{
+		// Print the command name and the brief description.
+		CON_printf("%6s: %s\n", psEntry->cmd, psEntry->help);
+
+		// Advance to the next entry in the table.
+		psEntry++;
+	}
+	return(0);
+}
+
+//*****************************************************************************
+// This is the table that holds the command names, implementing functions, and
+// brief description.
+//*****************************************************************************
+SHELL_COMMAND g_psShellCmds[] =
+{
+{ "help",       Cmd_help,       "display list of commands" },
+{ "?",          Cmd_help,       "alias for help" },
+{ "cfg",        Cmd_cfg,        "configure settings" },
+#if HAS_PTS == 1
+{ "pts",        Cmd_pts,        "protothread scheduler" },
+#endif
+#if HAS_LOG == 1
+{ "log",        Cmd_log,        "logging options" },
+#endif    
+#if HAS_CLI == 1
+{ "cli",        Cmd_cli,        "command lines" },
+#endif
+#if HAS_EVT == 1
+{ "evt",        Cmd_evt,        "events" },
+#endif
+{ "ed",         Cmd_ted,        "text editor" },
+{ 0, 0, 0 }
+};
+
 }
 
 class SysTick : CTimerFunc
@@ -2319,7 +2412,7 @@ public:
 	void Func(void) { SysTickIntHandler(); }
 };
 
-int __cdecl wmain(int argc, WCHAR* argv[])
+int main(int argc, char *argv[]) 
 {
 	argc; // unused
 	argv; // unused
@@ -2357,16 +2450,25 @@ int __cdecl wmain(int argc, WCHAR* argv[])
 	printf("\n");
 	BSP_return_msec_cnt(t1);
 */
-	PTS_Init();
-	TRM_Init();
-
 	if (CON_Init() != 0)
 	{
 		printf("Unable to enter VT processing mode. Quitting.\n");
 		return -1;
 	}
 
-	Cmd_ted(0, NULL);
+#if HAS_PTS == 1
+	PTS_Init();
+#endif
+#if HAS_CLI == 1
+	CLI_Init();
+#endif
+
+#if HAS_PTS == 1
+	while (PTS_GetTaskCnt() > 0)
+	{
+		PTS_Process();
+	}
+#endif
 
 #if 0
 	// Exit the alternate buffer

@@ -6,6 +6,7 @@
  */
 
 #ifdef WIN32
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdarg.h>
 
@@ -53,6 +54,24 @@ void CON_trace(const char *pcFormat, ...)
 
 void CON_Flush(void)
 {
+}
+
+void CON_EchoSet(bool state)
+{
+}
+
+bool CON_EchoGet(void)
+{
+	return false;
+}
+
+void CON_NLSet(bool state)
+{
+}
+
+bool CON_NLGet(void)
+{
+	return false;
 }
 
 #else

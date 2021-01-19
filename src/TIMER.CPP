@@ -160,7 +160,7 @@ void CTimer::ProcessTimers()
 {
 #ifndef WIN32
 //	CPU_SEN_OFF(1);						  // for debug
-	short sreg = int_disable();		// disable interupts while in here
+   short sreg = int_disable();		// disable interupts while in here
 #endif
    if (Last->Next != NULL)
    {
@@ -170,7 +170,7 @@ void CTimer::ProcessTimers()
          t->wDelta = 0;
          do
          {
-				if (t->pThis != NULL)
+            if (t->pThis != NULL)
             {
 
                t->pThis->Event();
@@ -191,7 +191,7 @@ void CTimer::ProcessTimers()
          Last->Next->wDelta -= 1;
    }
 #ifndef WIN32
-	int_enable(sreg);			         // enable interupts if already enabled
+   int_enable(sreg);			         // enable interupts if already enabled
 //	CPU_SEN_ON(1);							  // for debug
 #endif
 }
@@ -271,12 +271,12 @@ PTimerLink CTimer::Schedule(unsigned int ticks,CTimerEvent *pThis,char mode)
 { 
    struct _TimerLink *t;
 #ifndef WIN32
-	short sreg = int_disable();      // disable interupts while in here
+   short sreg = int_disable();      // disable interupts while in here
 #endif
    if ((t = AllocTimer(ticks,pThis,mode)) == NULL)
    {
 #ifndef WIN32
-   	int_enable(sreg);			      // enable interupts if already enabled
+      int_enable(sreg);			      // enable interupts if already enabled
 #endif
       printf("\nSchedule(%04x,%04x,%02x) failed! ",ticks,pThis,mode);   //DBG_Printf("\nSchedule(%04x,%04x,%02x) failed! ",ticks,pThis,mode);
       Dump();
@@ -296,7 +296,7 @@ PTimerLink CTimer::Schedule(unsigned int ticks,CTimerEvent *pThis,char mode)
    t->Next = tp->Next;
    tp->Next = t;
 #ifndef WIN32
-	int_enable(sreg);			         // enable interupts if already enabled
+   int_enable(sreg);			         // enable interupts if already enabled
 #endif
    return t;
 }
@@ -316,7 +316,7 @@ void CTimer::Cancel(CTimerEvent *pThis)
 {  
    volatile struct _TimerLink *tp = Last;
 #ifndef WIN32
-	short sreg = int_disable();      // disable interupts while in here
+   short sreg = int_disable();      // disable interupts while in here
 #endif
    while (tp->Next != NULL)
    {
@@ -334,7 +334,7 @@ void CTimer::Cancel(CTimerEvent *pThis)
       tp = tp->Next;
    }
 #ifndef WIN32
-	int_enable(sreg);			         // enable interupts if already enabled
+   int_enable(sreg);			         // enable interupts if already enabled
 #endif
 }
 

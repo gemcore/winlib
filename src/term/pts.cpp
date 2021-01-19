@@ -27,7 +27,6 @@ extern "C"
 #include "cli.h"            // console handling
 #include "cfg.h"            // configuration interface
 #include "dbg.h"
-#define OK	0
 
 static bool pts_enable = false;
 
@@ -161,22 +160,25 @@ int PTS_DeleteTask(uint8_t id)
    {
       if (id < MAX_TCBS)
       {
-         Tcbs[id].state= PTS_IDLE;
-         Tcbs[id].id = 0xFF;
-         Tcbs[id].mode = 0;
-         if (Tcbs[id].Msg.pui8Buf)
-         {
-            free(Tcbs[id].Msg.pui8Buf);
-         }
-         if (Tcbs[id].pt)
-         {
-            delete Tcbs[id].pt;
-            Tcbs[id].pt = NULL;
-         }
-         return(--TaskCnt);
+		 if (&Tcbs[id] != CurTask)
+		 {
+            Tcbs[id].state = PTS_IDLE;
+			Tcbs[id].id = 0xFF;
+			Tcbs[id].mode = 0;
+			if (Tcbs[id].Msg.pui8Buf)
+			{
+               free(Tcbs[id].Msg.pui8Buf);
+			}
+			if (Tcbs[id].pt)
+			{
+               delete Tcbs[id].pt;
+               Tcbs[id].pt = NULL;
+			}
+			TaskCnt--;
+		 }
       }
    }
-   return -1;
+   return TaskCnt;
 }
 
 void PTS_RestartTask(uint8_t id)
@@ -250,6 +252,11 @@ uint8_t PTS_GetCurTaskId(void)
 Tcb *PTS_GetCurTask(void)
 {
    return CurTask;
+}
+
+uint8_t PTS_GetTaskCnt(void)
+{
+   return TaskCnt;
 }
 
 PTS_Thread *PTS_GetThread(uint8_t id)
@@ -541,7 +548,6 @@ bool Flasher::Run()
 }
 #endif
 
-#if 0
 static void usage(void)
 {
    CON_printf("init   : initialize\n");
@@ -666,5 +672,5 @@ int Cmd_pts(int argc, char *argv[])
    }
    return rc;
 }
-#endif
+
 }

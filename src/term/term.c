@@ -38,8 +38,7 @@
 #endif
 #include "platform_conf.h"
 
-//#ifdef BUILD_TERM
-#if 1
+#ifdef BUILD_TERM
 
 static void null_out(u8 b)
 {

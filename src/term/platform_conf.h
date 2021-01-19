@@ -24,7 +24,9 @@
 
 #define HAS_TRC   0         // include TRACE output
 
-#ifndef WIN32
+#ifdef WIN32
+#define strndup(P1,P2)        strdup(P1)
+#else
 #include "dbg.h"            // Debug serial I/O
 #if HAS_TRC == 1
 #define TRACE(format,...)     do{CON_trace(format,##__VA_ARGS__);CON_Flush();}while(0)

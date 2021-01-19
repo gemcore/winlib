@@ -101,6 +101,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -154,9 +155,22 @@
     <ClInclude Include="src\dhara\nand.h" />
     <ClInclude Include="src\GENERIC.HPP" />
     <ClInclude Include="src\LOG.H" />
+    <ClInclude Include="src\MDM.H" />
     <ClInclude Include="src\SCRIPT.HPP" />
     <ClInclude Include="src\sim.h" />
     <ClInclude Include="src\SYSERR.H" />
+    <ClInclude Include="src\term\bsp.h" />
+    <ClInclude Include="src\term\cfg.h" />
+    <ClInclude Include="src\term\cli.h" />
+    <ClInclude Include="src\term\dbg.h" />
+    <ClInclude Include="src\term\evt.h" />
+    <ClInclude Include="src\term\history.h" />
+    <ClInclude Include="src\term\linenoise.h" />
+    <ClInclude Include="src\term\platform_conf.h" />
+    <ClInclude Include="src\term\pts.hpp" />
+    <ClInclude Include="src\term\ringbuf.h" />
+    <ClInclude Include="src\term\term.h" />
+    <ClInclude Include="src\term\type.h" />
     <ClInclude Include="src\Thread.h" />
     <ClInclude Include="src\TIMER.H" />
     <ClInclude Include="src\TMR.H" />
@@ -181,6 +195,18 @@
     <ClCompile Include="src\main_nand.c" />
     <ClCompile Include="src\SCRIPT.CPP" />
     <ClCompile Include="src\sim.c" />
+    <ClCompile Include="src\term\bsp.c" />
+    <ClCompile Include="src\term\cfg.c" />
+    <ClCompile Include="src\term\cli.cpp" />
+    <ClCompile Include="src\term\dbg.c" />
+    <ClCompile Include="src\term\evt.cpp" />
+    <ClCompile Include="src\term\history.cpp" />
+    <ClCompile Include="src\term\linenoise.cpp" />
+    <ClCompile Include="src\term\pts.cpp" />
+    <ClCompile Include="src\term\ringbuf.c" />
+    <ClCompile Include="src\term\ted.cpp" />
+    <ClCompile Include="src\term\term.c" />
+    <ClCompile Include="src\term\trm.cpp" />
     <ClCompile Include="src\TIMER.CPP" />
     <ClCompile Include="src\TMR.CPP" />
     <ClCompile Include="src\util.c" />

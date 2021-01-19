@@ -334,7 +334,6 @@ void EVT_Process(void)
     }
 }
 
-#if 0
 static void usage(void)
 {
    CON_printf("on    : enable\n");
@@ -540,6 +539,6 @@ int Cmd_evt(int argc, char *argv[])
    }
    return(0);
 }
-#endif
+
 }
 /* End Of File */
