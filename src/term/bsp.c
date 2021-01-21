@@ -4,6 +4,9 @@
 
 volatile uint32_t sys_seconds_cnt;
 volatile uint16_t sys_millisec_cnt;
+static bool led_heartbeat_enable = true;
+static uint8_t led_state;
+static uint8_t pulse_heartbeat_cnt = 0xFF;
 uint32_t bsp_millisec_cnt[NR_OF_MSEC_COUNTERS];
 uint8_t bsp_millisec_cnt_flag[NR_OF_MSEC_COUNTERS];
 static void(*systick_hook)(uint32_t);
@@ -46,6 +49,18 @@ void SysTickIntHandler(void)
 		if ((bsp_millisec_cnt_flag[i] & 0x03) == 0x02)
 		{
 			bsp_millisec_cnt[i] += millisec_increment;
+		}
+	}
+	if (!led_heartbeat_enable && pulse_heartbeat_cnt != 0xFF)
+	{
+		if (pulse_heartbeat_cnt > 0)
+		{
+			pulse_heartbeat_cnt--;
+		}
+		else if (pulse_heartbeat_cnt == 0)
+		{
+			pulse_heartbeat_cnt = 0xFF;
+			BSP_toggle_heartbeat_led();
 		}
 	}
 }
@@ -123,3 +138,47 @@ void BSP_enable_msec_cnt(uint8_t counterId, bool flag)
 	}
 }
 
+void BSP_enable_heartbeat_led(bool flag)
+{
+	led_heartbeat_enable = flag;
+}
+
+bool BSP_set_heartbeat_led(bool state)
+{
+#if HAS_LED == 1
+	if (state)
+		GPIOPinWrite(LED_GPIO_PORTBASE, LED_GPIO_PIN, LED_GPIO_PIN);	// turn off
+	else
+		GPIOPinWrite(LED_GPIO_PORTBASE, LED_GPIO_PIN, 0);				// turn on
+#endif
+	return state;
+}
+
+bool BSP_toggle_heartbeat_led(void)
+{
+	led_state ^= 1;
+#if HAS_LED == 1
+	if (led_state & 1)
+		GPIOPinWrite(LED_GPIO_PORTBASE, LED_GPIO_PIN, 0);
+	else
+		GPIOPinWrite(LED_GPIO_PORTBASE, LED_GPIO_PIN, LED_GPIO_PIN);
+#endif
+	return led_state;
+}
+
+void BSP_pulse_heartbeat_led(void)
+{
+	if (!led_heartbeat_enable && pulse_heartbeat_cnt == 0xFF)
+	{
+		pulse_heartbeat_cnt = 50;
+	}
+}
+
+void BSP_msec_delay(uint32_t interval)
+{
+#ifndef WIN32
+	ROM_SysCtlDelay((g_ui32SysClock / (3 * 1000))*interval);
+#else
+
+#endif
+}

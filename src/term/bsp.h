@@ -60,6 +60,13 @@ void BSP_reset_msec_cnt(uint8_t counterId);
 uint32_t BSP_get_msec_cnt(uint8_t counterId);
 void BSP_enable_msec_cnt(uint8_t counterId, bool flag);
 
+void BSP_enable_heartbeat_led(bool flag);
+bool BSP_set_heartbeat_led(bool state);
+bool BSP_toggle_heartbeat_led(void);
+void BSP_pulse_heartbeat_led(void);
+void BSP_msec_delay(uint32_t interval);
+
+
 #ifdef    __cplusplus
 }
 #endif // __cplusplus

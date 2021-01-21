@@ -1,22 +1,23 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include <string.h>
+#include "bsp.h"            // board support functions
 #ifndef WIN32
 #include "ustdlib.h"
+#include "fio.h"
 #else
 #include <stdio.h>
 #include <stdlib.h>
 #endif
-#include "bsp.h"            // board support functions
-#ifndef WIN32
-#include "fio.h"
-#endif
+#if HAS_EVT == 1
 #include "evt.h"            // Event handling
-//#if HAS_PTS == 1
-#if 1
+#endif
+#if HAS_PTS == 1
 #include "pts.hpp"          // Scheduler
 #endif
+#if HAS_CLI == 1
 #include "cli.h"            // Console handling
+#endif
 #include "dbg.h"            // debug console functions
 #include "platform_conf.h"
 #include "term.h"
@@ -273,7 +274,6 @@ void term_dumplines(tLine *head)
       i++;
    }
 }
-
 }
 
 class TED_Thread : public PTS_Thread
@@ -286,6 +286,7 @@ public:
    virtual bool Run();
 
    int setup(unsigned x0, unsigned y0, unsigned x1, unsigned y1, char *filename, char flag);
+   int setup(unsigned x0, unsigned y0, char *filename, char flag);
 
    // Editor termination.
    virtual int Enter(void) { return EDIT_ENTER; }
@@ -405,6 +406,19 @@ int TED_Thread::setup(unsigned x0, unsigned y0, unsigned x1, unsigned y1, char *
 
    active = true;
    return rc;
+}
+
+int TED_Thread::setup(unsigned x0, unsigned y0, char *buffer, char flag)
+{
+	x_cur = term_get_cx();
+	y_cur = term_get_cy();
+	term_gotoxy(x0, y0);
+	term_clrline(0);
+
+	dflag = flag;
+
+	active = true;
+	return 0;
 }
 
 // Process a text line from the user.
@@ -1158,6 +1172,7 @@ int Cmd_ted(int argc,char *argv[])
 {
    char filename[40];
    char dflag = 0;
+   char bflag = 0;
    filename[0] ='\0';
    for (int i=1; (argc-i) > 0; i++)
    {
@@ -1165,19 +1180,33 @@ int Cmd_ted(int argc,char *argv[])
       {
          dflag = 1;
       }
-      else
+	  else if (!strcmp("-b", argv[i]))
+	  {
+		  bflag = 1;
+	  }
+	  else
       {
          strncat(filename, argv[i], 40);
       }
    }
 
-#ifndef WIN32
+#if HAS_CLI == 1
    // Suspend CLI processing.
    CLI_SetEnable(false);
    PTS_GetTask(CLI_GetId())->pt->Suspend();
 #endif
    ted_pt = new TED_Thread();
    ted_pt->id = PTS_AddTask(ted_pt, 0x01, 32);
+   if (bflag)
+   {
+	   unsigned x0 = term_get_cx();
+	   ted_pt->setup(1, 0, filename, dflag);
+	   if (ted_pt->editbuf(filename) == 0)
+	   {
+	   }
+	   goto quit;
+   }
+
    ted_pt->setup(1, 1, 80, 24, filename, dflag);
 #if 0
    ted_pt->setmsgid(ted_pt->id);
@@ -1239,10 +1268,11 @@ int Cmd_ted(int argc,char *argv[])
       }
    }
 
+quit:
    ted_pt->Stop();
    PTS_DeleteTask(ted_pt->id);
 
-#ifndef WIN32
+#if HAS_CLI == 1
    // Resume CLI processing.
    PTS_GetTask(CLI_GetId())->pt->Resume();
    CLI_SetEnable(true);

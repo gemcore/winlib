@@ -22,6 +22,15 @@
     <Filter Include="Source Files\term">
       <UniqueIdentifier>{b8ab706b-5d4d-44c0-9ed4-301b085a9fe8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\picoc">
+      <UniqueIdentifier>{d9ebcf3f-3738-4df6-8432-39201dc2c917}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\picoc\platform">
+      <UniqueIdentifier>{36e31fdf-046d-4f70-ad3b-911e734cd47b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\picoc\cstdlib">
+      <UniqueIdentifier>{1db909c3-5bf4-4cda-8435-ff6bd529e68f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -141,6 +150,18 @@
     <ClInclude Include="src\term\linenoise.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\picoC\platform.h">
+      <Filter>Source Files\picoc</Filter>
+    </ClInclude>
+    <ClInclude Include="src\picoC\picoc.h">
+      <Filter>Source Files\picoc</Filter>
+    </ClInclude>
+    <ClInclude Include="src\picoC\LICENSE.h">
+      <Filter>Source Files\picoc</Filter>
+    </ClInclude>
+    <ClInclude Include="src\picoC\interpreter.h">
+      <Filter>Source Files\picoc</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -235,6 +256,69 @@
     </ClCompile>
     <ClCompile Include="src\term\linenoise.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\picoC\variable.c">
+      <Filter>Source Files\picoc</Filter>
+    </ClCompile>
+    <ClCompile Include="src\picoC\type.c">
+      <Filter>Source Files\picoc</Filter>
+    </ClCompile>
+    <ClCompile Include="src\picoC\table.c">
+      <Filter>Source Files\picoc</Filter>
+    </ClCompile>
+    <ClCompile Include="src\picoC\platform.c">
+      <Filter>Source Files\picoc</Filter>
+    </ClCompile>
+    <ClCompile Include="src\picoC\picoc.c">
+      <Filter>Source Files\picoc</Filter>
+    </ClCompile>
+    <ClCompile Include="src\picoC\parse.c">
+      <Filter>Source Files\picoc</Filter>
+    </ClCompile>
+    <ClCompile Include="src\picoC\lex.c">
+      <Filter>Source Files\picoc</Filter>
+    </ClCompile>
+    <ClCompile Include="src\picoC\include.c">
+      <Filter>Source Files\picoc</Filter>
+    </ClCompile>
+    <ClCompile Include="src\picoC\heap.c">
+      <Filter>Source Files\picoc</Filter>
+    </ClCompile>
+    <ClCompile Include="src\picoC\expression.c">
+      <Filter>Source Files\picoc</Filter>
+    </ClCompile>
+    <ClCompile Include="src\picoC\debug.c">
+      <Filter>Source Files\picoc</Filter>
+    </ClCompile>
+    <ClCompile Include="src\picoC\clibrary.c">
+      <Filter>Source Files\picoc</Filter>
+    </ClCompile>
+    <ClCompile Include="src\picoC\platform\platform_tm4c129x.c">
+      <Filter>Source Files\picoc\platform</Filter>
+    </ClCompile>
+    <ClCompile Include="src\picoC\cstdlib\ctype.c">
+      <Filter>Source Files\picoc\cstdlib</Filter>
+    </ClCompile>
+    <ClCompile Include="src\picoC\cstdlib\errno.c">
+      <Filter>Source Files\picoc\cstdlib</Filter>
+    </ClCompile>
+    <ClCompile Include="src\picoC\cstdlib\math.c">
+      <Filter>Source Files\picoc\cstdlib</Filter>
+    </ClCompile>
+    <ClCompile Include="src\picoC\cstdlib\stdbool.c">
+      <Filter>Source Files\picoc\cstdlib</Filter>
+    </ClCompile>
+    <ClCompile Include="src\picoC\cstdlib\stdio.c">
+      <Filter>Source Files\picoc\cstdlib</Filter>
+    </ClCompile>
+    <ClCompile Include="src\picoC\cstdlib\stdlib.c">
+      <Filter>Source Files\picoc\cstdlib</Filter>
+    </ClCompile>
+    <ClCompile Include="src\picoC\cstdlib\string.c">
+      <Filter>Source Files\picoc\cstdlib</Filter>
+    </ClCompile>
+    <ClCompile Include="src\picoC\cstdlib\time.c">
+      <Filter>Source Files\picoc\cstdlib</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

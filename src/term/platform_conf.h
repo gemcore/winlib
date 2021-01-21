@@ -26,6 +26,7 @@
 
 #ifdef WIN32
 #define strndup(P1,P2)        strdup(P1)
+#define TRACE(format,...)
 #else
 #include "dbg.h"            // Debug serial I/O
 #if HAS_TRC == 1

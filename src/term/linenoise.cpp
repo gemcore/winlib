@@ -83,13 +83,13 @@
 #include <errno.h>
 #include <string.h>
 #include <ctype.h>
+#include "bsp.h"
 #ifndef WIN32
 #include "fio.h"
 #include "ustdlib.h"
 #else
 #include <stdio.h>
 #include <stdlib.h>
-#include "bsp.h"
 #endif
 #include "evt.h"            // Event handling
 #include "pts.hpp"          // Scheduler

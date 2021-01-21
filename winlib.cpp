@@ -2311,6 +2311,7 @@ int CON_getc()
 extern void TRM_Init();
 extern void TRM_Term();
 extern int Cmd_ted(int argc, char *argv[]);
+extern int Cmd_pic(int argc, char *argv[]);
 
 void MEM_Dump(uint8_t *data, uint16_t len, uint32_t base)
 {
@@ -2400,6 +2401,7 @@ SHELL_COMMAND g_psShellCmds[] =
 { "evt",        Cmd_evt,        "events" },
 #endif
 { "ed",         Cmd_ted,        "text editor" },
+{ "pic",        Cmd_pic,        "pico C" },
 { 0, 0, 0 }
 };
 
