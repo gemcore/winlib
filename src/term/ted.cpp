@@ -106,11 +106,11 @@ unsigned y_bot = (24-1);
 
 void term_setbox(unsigned x0, unsigned y0, unsigned x1, unsigned y1)
 {
-	x_lft = x0 + 1;
-	y_top = y0 + 1;
-	x_rgt = x1 - 1;
-	y_bot = y1 - 1;
-	term_putbox(x0, y0, x1, y1);
+   x_lft = x0 + 1;
+   y_top = y0 + 1;
+   x_rgt = x1 - 1;
+   y_bot = y1 - 1;
+   term_putbox(x0, y0, x1, y1);
 }
 
 void term_putprompt(char *p)
@@ -376,10 +376,10 @@ TED_Thread::TED_Thread()
 
 TED_Thread::~TED_Thread()
 {  
-	term_gotoxy(x_lft, y_top);
-	term_clrscr();
-	// Free up allocated lines in list.
-	freelines();
+   term_gotoxy(x_lft, y_top);
+   term_clrscr();
+   // Free up allocated lines in list.
+   freelines();
 }
 
 int TED_Thread::Init(void)
@@ -400,9 +400,9 @@ int TED_Thread::setup(unsigned x0, unsigned y0, unsigned x1, unsigned y1, char *
 
    int rc = loadlines(fname);
    if (rc == 0)
-	   term_puttitle(fname);
+      term_puttitle(fname);
    else
-	   term_puttitle(" New file ");
+      term_puttitle(" New file ");
 
    active = true;
    return rc;
@@ -410,15 +410,15 @@ int TED_Thread::setup(unsigned x0, unsigned y0, unsigned x1, unsigned y1, char *
 
 int TED_Thread::setup(unsigned x0, unsigned y0, char *buffer, char flag)
 {
-	x_cur = term_get_cx();
-	y_cur = term_get_cy();
-	term_gotoxy(x0, y0);
-	term_clrline(0);
+   x_cur = term_get_cx();
+   y_cur = term_get_cy();
+   term_gotoxy(x0, y0);
+   term_clrline(0);
 
-	dflag = flag;
+   dflag = flag;
 
-	active = true;
-	return 0;
+   active = true;
+   return 0;
 }
 
 // Process a text line from the user.
@@ -550,7 +550,7 @@ bool TED_Thread::Run()
       else
       {
          // Insert printable ascii characters into the buffer.
-		 c &= 0xFF;
+       c &= 0xFF;
          if (isprint(c) && len < cmdlen)
          {
             if (len == pos) 
@@ -726,20 +726,20 @@ void TED_Thread::freelines(void)
    // Free up allocated lines in list (starting at the head of the list).
    while (head.next != NULL)
    {
-	   tLine *line = head.next;
-	   if (line != NULL)
-	   {
-		   head.next = line->next;
-		   if (line->p)
-		   {
-			   delete line->p;
-		   }
-		   delete line;
-	   }
-	   else
-	   {
-		   head.next = NULL;
-	   }      
+      tLine *line = head.next;
+      if (line != NULL)
+      {
+         head.next = line->next;
+         if (line->p)
+         {
+            delete line->p;
+         }
+         delete line;
+      }
+      else
+      {
+         head.next = NULL;
+      }      
    }
 }
 
@@ -1056,7 +1056,7 @@ int TED_Thread::edit(void)
                term_printfxy(0,25,"up   n=%03d pos=%02d ", n_cur, pos);
                term_dumplines(&head);
             }
-	up:            
+   up:            
             // Move up a line in the file.
             n_cur -= 1;
             if (n_cur <= 0)
@@ -1180,11 +1180,11 @@ int Cmd_ted(int argc,char *argv[])
       {
          dflag = 1;
       }
-	  else if (!strcmp("-b", argv[i]))
-	  {
-		  bflag = 1;
-	  }
-	  else
+     else if (!strcmp("-b", argv[i]))
+     {
+        bflag = 1;
+     }
+     else
       {
          strncat(filename, argv[i], 40);
       }
@@ -1199,12 +1199,12 @@ int Cmd_ted(int argc,char *argv[])
    ted_pt->id = PTS_AddTask(ted_pt, 0x01, 32);
    if (bflag)
    {
-	   unsigned x0 = term_get_cx();
-	   ted_pt->setup(1, 0, filename, dflag);
-	   if (ted_pt->editbuf(filename) == 0)
-	   {
-	   }
-	   goto quit;
+      unsigned x0 = term_get_cx();
+      ted_pt->setup(1, 0, filename, dflag);
+      if (ted_pt->editbuf(filename) == 0)
+      {
+      }
+      goto quit;
    }
 
    ted_pt->setup(1, 1, 80, 24, filename, dflag);
@@ -1219,15 +1219,15 @@ int Cmd_ted(int argc,char *argv[])
       if (ted_pt->edit() != 0)
       {
          //TODO: Edit error occurred!
-		  ted_pt->active = false;
-		  continue;
+        ted_pt->active = false;
+        continue;
       }
 
       if (ted_pt->sflag || ted_pt->eflag)
       {
          if (ted_pt->sflag)
          {
-           term_putprompt("Buffer is not saved. Exit [ynw]?");
+            term_putprompt("Buffer is not saved. Exit [ynw]?");
          }
          else
          {
@@ -1269,6 +1269,9 @@ int Cmd_ted(int argc,char *argv[])
    }
 
 quit:
+   term_gotoxy(x_lft, y_top);
+   term_clrscr();
+
    ted_pt->Stop();
    PTS_DeleteTask(ted_pt->id);
 

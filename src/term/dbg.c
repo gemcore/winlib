@@ -12,22 +12,22 @@
 
 //int CON_Init(void)
 //{
-//	return 0;
+//    return 0;
 //}
 
 //int CON_kbhit()
 //{
-//	return 0;
+//    return 0;
 //}
 
 //int CON_getc()
 //{
-//	return 0;
+//    return 0;
 //}
 
 int CON_putc(char c)
 {
-	return putchar(c);
+    return putchar(c);
 }
 
 void CON_ungetc(char c)
@@ -36,16 +36,16 @@ void CON_ungetc(char c)
 
 void CON_printf(const char *format, ...)
 {
-	va_list ap;
-	// Start the varargs processing.
-	va_start(ap, format);
-	{
-		char buf[BUFSIZ];
-		vsprintf(buf, format, ap);
-		term_putstr(buf, strlen(buf));
-	}
-	// We're finished with the varargs now.
-	va_end(ap);
+    va_list ap;
+    // Start the varargs processing.
+    va_start(ap, format);
+    {
+        char buf[BUFSIZ];
+        vsprintf(buf, format, ap);
+        term_putstr(buf, strlen(buf));
+    }
+    // We're finished with the varargs now.
+    va_end(ap);
 }
 
 void CON_trace(const char *pcFormat, ...)
@@ -62,7 +62,7 @@ void CON_EchoSet(bool state)
 
 bool CON_EchoGet(void)
 {
-	return false;
+    return false;
 }
 
 void CON_NLSet(bool state)
@@ -71,7 +71,7 @@ void CON_NLSet(bool state)
 
 bool CON_NLGet(void)
 {
-	return false;
+    return false;
 }
 
 #else

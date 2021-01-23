@@ -222,10 +222,10 @@ protected:
  *****************************************************************************/
 #include "ringbuf.h"
 
-#define PTS_IDLE	0
-#define PTS_INIT	1
-#define PTS_RUN   2
-#define PTS_DEAD	3
+#define PTS_IDLE    0
+#define PTS_INIT    1
+#define PTS_RUN     2
+#define PTS_DEAD    3
 
 #define MAX_TCBS	32
 

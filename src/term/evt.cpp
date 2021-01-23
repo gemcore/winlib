@@ -17,7 +17,7 @@
 #include "cfg.h"
 #include "ringbuf.h" // Ring buffer
 #if HAS_MNU == 1
-#include "menu.hpp"			// Menu definitions
+#include "menu.hpp"         // Menu definitions
 #endif
 #include "pts.hpp"         // Scheduler
 #include "evt.h"           // event handling
@@ -108,18 +108,18 @@ void EVT_Make(uint8_t *evt, int code, uint8_t *bufptr, int buflen)
 
 void DumpChar(byte b)
 {
-	if (isprint(b))
-		CON_printf("%c",b);
+    if (isprint(b))
+        CON_printf("%c",b);
     else if (b == '\b')
-    	CON_printf("%c",b);
+        CON_printf("%c",b);
     else if (b == '\r')
         ;
     else if (b == '\n')
-    	CON_printf("\n");
+        CON_printf("\n");
     else if (b == '\0')
         CON_printf("<NUL>");
     else
-    	CON_printf("[%02x]",b&0xFF);
+        CON_printf("[%02x]",b&0xFF);
 }
 
 void EVT_Process(void)

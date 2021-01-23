@@ -24,17 +24,17 @@
 #include "script.hpp"       // Script processor
 #endif
 #if HAS_OBD == 1
-#include "ecu/ECU.hpp"		// ECU base class
+#include "ecu/ECU.hpp"      // ECU base class
 #endif
 #if HAS_MNU == 1
-#include "menu.hpp"			// Menu definitions
+#include "menu.hpp"         // Menu definitions
 #endif
 #if HAS_PTS == 1
 #include "pts.hpp"          // Scheduler
 #endif
 #if HAS_FFS == 1
 #include "fatfs/src/ff.h"
-//#include "ffs.h"			// Flash File System
+//#include "ffs.h"          // Flash File System
 #define PATH_BUF_SIZE       80
 #endif
 #if HAS_MDM == 1
@@ -63,7 +63,7 @@ extern "C" void TRM_Term();
 /* FFS definitions. */
 extern "C" char g_pcCwd[];
 
-#define NULL	0
+#define NULL    0
 
 //*****************************************************************************
 // A structure that holds a mapping between an FRESULT numerical code, and a
@@ -325,7 +325,7 @@ CLI_Thread::~CLI_Thread()
 
 int CLI_Thread::Init(void)
 {
-	TRACE("CLI: Init\n");
+    TRACE("CLI: Init\n");
     CLI_Setup(CLI_PROMPT, CLI_HISTORY_FNAME, CLI_HISTORY_SIZE);
     return 0;
 }
@@ -339,12 +339,12 @@ bool CLI_Thread::Run()
 #if HAS_MNU == 1
     if (MNU_IsActive())
     {
-    	if (CON_kbhit())
-    	{
-			uint8_t evt[]={2,EVT_BTN,0};
-    		char c = CON_getc();
-    		switch(c)
-    		{
+        if (CON_kbhit())
+        {
+            uint8_t evt[]={2,EVT_BTN,0};
+            char c = CON_getc();
+            switch(c)
+            {
             case '1':
                 evt[2] = KEY_LFT;
                 EVT_PutMsg(evt);
@@ -356,10 +356,10 @@ bool CLI_Thread::Run()
                 EVT_PutMsg(evt);
                 break;
 
-            case '3':		// Key 2 (MenuIncr)
-    			evt[2] = KEY_INC;
+            case '3':        // Key 2 (MenuIncr)
+                evt[2] = KEY_INC;
                 EVT_PutMsg(evt);
-    			break;
+                break;
 
             case '4':       // Key 3 (MenuDecr)
                 evt[2] = KEY_DEC;
@@ -376,8 +376,8 @@ bool CLI_Thread::Run()
                 evt[2] = KEY_RGT;
                 EVT_PutMsg(evt);
                 break;
-    		}
-    	}
+            }
+        }
     }
     else
 #endif

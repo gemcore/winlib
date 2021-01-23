@@ -160,22 +160,22 @@ int PTS_DeleteTask(uint8_t id)
    {
       if (id < MAX_TCBS)
       {
-		 if (&Tcbs[id] != CurTask)
-		 {
+         //if (&Tcbs[id] != CurTask)
+         //{
             Tcbs[id].state = PTS_IDLE;
-			Tcbs[id].id = 0xFF;
-			Tcbs[id].mode = 0;
-			if (Tcbs[id].Msg.pui8Buf)
-			{
-               free(Tcbs[id].Msg.pui8Buf);
-			}
-			if (Tcbs[id].pt)
-			{
-               delete Tcbs[id].pt;
-               Tcbs[id].pt = NULL;
-			}
-			TaskCnt--;
-		 }
+            Tcbs[id].id = 0xFF;
+            Tcbs[id].mode = 0;
+            if (Tcbs[id].Msg.pui8Buf)
+            {
+                  free(Tcbs[id].Msg.pui8Buf);
+            }
+            if (Tcbs[id].pt)
+            {
+                  delete Tcbs[id].pt;
+                  Tcbs[id].pt = NULL;
+            }
+            TaskCnt--;
+         //}
       }
    }
    return TaskCnt;
@@ -413,23 +413,23 @@ int PTS_ProcessTaskId(uint8_t i)
    switch (task->state)
    {
    case PTS_IDLE:
-   	break;
+      break;
 
    case PTS_INIT:
-   	if (task->pt != NULL)
-   	{
-   		rc = task->pt->Init();
-   		TRACEF("%s Init() rc=%d\n", CurTask->pt->Name(), rc);
-   		task->state = PTS_RUN;
-   	}
-   	else
-   	{
-   		task->state = PTS_IDLE;
-   	}
-   	break;
+      if (task->pt != NULL)
+      {
+         rc = task->pt->Init();
+         TRACEF("%s Init() rc=%d\n", CurTask->pt->Name(), rc);
+         task->state = PTS_RUN;
+      }
+      else
+      {
+         task->state = PTS_IDLE;
+      }
+      break;
 
    case PTS_RUN:
-   	rc = task->pt->Run();
+      rc = task->pt->Run();
 #if HAS_CPU_USAGE == 1
       // Call the CPU usage tick function.  This function will compute the amount
       // of cycles used by the CPU since the last call and return the result in
@@ -446,11 +446,11 @@ int PTS_ProcessTaskId(uint8_t i)
          task->tick.tmax = max(task->tick.tmax, task->tick.tcur);
       }
 #endif
-   	TRACEF("%s Run() rc=%d\n", CurTask->pt->Name(), rc);
-   	break;
+      TRACEF("%s Run() rc=%d\n", CurTask->pt->Name(), rc);
+      break;
 
    case PTS_DEAD:
-   	break;
+      break;
    }
    return rc;
 }

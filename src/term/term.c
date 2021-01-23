@@ -4,26 +4,25 @@
  *  Created on: Jan 06, 2020
  *     Author: Alan
  * 
- * 	ANSI Terminal sequence support, which makes use of the following sequences:
+ *  ANSI Terminal sequence support, which makes use of the following sequences:
  * 
- *    Sequence	         Code	    Description	Behavior
- *     ESC [ <n> A	     CUU	    Cursor Up	Cursor up by <n>
- *     ESC [ <n> B	     CUD	    Cursor Down	Cursor down by <n>
- *     ESC [ <n> C	     CUF	    Cursor Forward	Cursor forward (Right) by <n>
- *     ESC [ <n> D	     CUB	    Cursor Backward	Cursor backward (Left) by <n>
- *     ESC [ <n> G	     CHA	    Cursor Horizontal Absolute	Cursor moves to <n>th position horizontally in the current line
- *     ESC [ <n> d	     VPA	    Vertical Line Position Absolute	Cursor moves to the <n>th position vertically in the current column
- *     ESC [ <y> ; <x> H CUP	    Cursor Position	*Cursor moves to <x>; <y> coordinate within the viewport, where <x> is the column of the <y> line
- *     ESC [ 2 J   CLS            Clear Screen
- *     ESC [ <n> K EL             Erase Line
- *                                <n> is 0 or missing, clear from cursor to end of line
- *                                <n> is 1, clear from beginning of line to cursor
- *                                <n> is 2, clear entire line      
- *    Used:
- *    ESC [ <n> E	       CNL      Cursor Next Line	Cursor down <n> lines from current position
- *    ESC [ <n> F	       CPL      Cursor Previous Line	Cursor up <n> lines from current position
- *    ESC [ <y> ; <x> f  HVP      Horizontal Vertical Position
- *                                Cursor moves to <x>; <y> coordinate within the viewport, where <x> is the column of the <y> line
+ *  Sequence    Code Description           Behavior
+ *  ESC[<n>A     CUU Cursor Up             Cursor up by <n>
+ *  ESC[<n>B     CUD Cursor Down           Cursor down by <n>
+ *  ESC[<n>C     CUF Cursor Forward        Cursor forward (Right) by <n>
+ *  ESC[<n>D     CUB Cursor Backward       Cursor backward (Left) by <n>
+ *  ESC[<n>G     CHA Cursor Horz Abs       Cursor moves to <n>th position horizontally in the current line
+ *  ESC[<n>d     VPA Vertical Line Pos Abs Cursor moves to the <n>th position vertically in the current column
+ *  ESC[<y>;<x>H CUP Cursor Pos            Cursor moves to <x>; <y> coordinate within the viewport, where <x> is the column of the <y> line
+ *  ESC[2J       CLS Clear Screen
+ *  ESC[<n>K     EL  Erase Line
+ *                     <n> is 0 or missing, clear from cursor to end of line
+ *                     <n> is 1, clear from beginning of line to cursor
+ *                     <n> is 2, clear entire line      
+ * Used:
+ * ESC[<n>E      CNL Cursor Next Line      Cursor down <n> lines from current position
+ * ESC[<n>F      CPL Cursor Previous Line  Cursor up <n> lines from current position
+ * ESC[<y>;<x>f  HVP Cursor Horz & Vert Pos Cursor moves to <x>; <y> coordinate within the viewport, where <x> is the column of the <y> line
 */
 
 #include <stdarg.h>
@@ -34,7 +33,7 @@
 #include "fio.h"
 #else
 #include <stdio.h>
-#define BUFSIZ	512
+#define BUFSIZ    512
 #endif
 #include "platform_conf.h"
 

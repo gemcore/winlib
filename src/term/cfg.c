@@ -29,7 +29,7 @@
 #define HAS_CFG_SAVE
 
 #undef TRACE
-//#define TRACE(format,...)	CON_printf(format,##__VA_ARGS__)
+//#define TRACE(format,...)    CON_printf(format,##__VA_ARGS__)
 //#define TRACEF(format,...)  do{CON_printf(format,##__VA_ARGS__);CON_Flush();}while(0)   // wait for data to be sent
 #define TRACE(format,...)
 #define TRACEF(format,...)
@@ -358,10 +358,10 @@ bool CFG_Load(void)
 static void usage(void)
 {
     CON_printf("load  : load configuration\n");
-	CON_printf("save  : save configuration\n");
+    CON_printf("save  : save configuration\n");
     CON_printf("dbg   : toggle debug flag\n");
 //#if HAS_SAP == 1
-	CON_printf("sap   : set sap mode\n");
+    CON_printf("sap   : set sap mode\n");
 //#endif
 //#if HAS_RFS == 1
     CON_printf("rfs   : set ram file system\n");
@@ -370,14 +370,14 @@ static void usage(void)
     CON_printf("ffs   : set flash file system\n");
 //#endif
 //#if HAS_HIB == 1
-	CON_printf("hib   : set hibernation\n");
-	CON_printf("rtc   : set display\n");
+    CON_printf("hib   : set hibernation\n");
+    CON_printf("rtc   : set display\n");
 //#endif
 //#if HAS_CLI == 1
     CON_printf("result: set enable/disable\n");
     CON_printf("verb  : set verbostiy 0-3\n");
 //#endif
-	CON_printf("con   : set console id\n");
+    CON_printf("con   : set console id\n");
     CON_printf("sbl   : set sbl boot\n");
 }
 
@@ -386,15 +386,15 @@ int Cmd_cfg(int argc, char *argv[])
     if (argc > 1)
     {
         char *p = argv[1];
-    	if (!strcmp(p,"load"))
+        if (!strcmp(p,"load"))
         {
-    		// Load and print the configuration to the console.
-    		CFG_Load();
+            // Load and print the configuration to the console.
+            CFG_Load();
         }
-    	else if (!strcmp(p,"save"))
-    	{
+        else if (!strcmp(p,"save"))
+        {
             bool save = true;
-    	    // Save the current configuration to flash.
+            // Save the current configuration to flash.
             if (argc > 2)
             {
                 if (!strcmp(argv[2],"ff"))
@@ -403,10 +403,10 @@ int Cmd_cfg(int argc, char *argv[])
                     save = false;
                 }
             }
-   	        CFG_Save(save);
-    	}
-    	else if (!strcmp(p,"dbg"))
-    	{
+               CFG_Save(save);
+        }
+        else if (!strcmp(p,"dbg"))
+        {
             word mask = 0x0000;
             byte bit = 0;
             if (argc > 2)
@@ -434,9 +434,9 @@ int Cmd_cfg(int argc, char *argv[])
                 bit = atoi(argv[2]);
                 mask <<= bit;
             }
-    	    CFG_ToggleTrace(mask);
-    	    CON_printf("dbg=%04x\n",CFG_GetTrace());
-    	}
+            CFG_ToggleTrace(mask);
+            CON_printf("dbg=%04x\n",CFG_GetTrace());
+        }
         else if (!strcmp(p,"sbl"))
         {
             if (argc > 2)
@@ -638,45 +638,45 @@ int Cmd_cfg(int argc, char *argv[])
             }
             CON_printf("verb=%s\n",VerbToStr(CFG_GetCliVerbosity()));
         }
-    	else if (!strcmp(p,"con"))
-    	{
-    		if (argc > 2)
-    		{
-    	        char *p = argv[2];
-    			if (!strcmp(p,"0") || !strcmp(p,"dbg"))
-    			{
-    			    CFG_SetConId(0);
-    			}
+        else if (!strcmp(p,"con"))
+        {
+            if (argc > 2)
+            {
+                char *p = argv[2];
+                if (!strcmp(p,"0") || !strcmp(p,"dbg"))
+                {
+                    CFG_SetConId(0);
+                }
 #if HAS_USB == 1
 #if HAS_CDC == 1
-    			else if (!strcmp(p,"1") || !strcmp(p,"usb"))
-    			{
-    			    CFG_SetConId(1);
-    			}
+                else if (!strcmp(p,"1") || !strcmp(p,"usb"))
+                {
+                    CFG_SetConId(1);
+                }
 #endif
 #endif
 #if HAS_NET == 1
-    			else if (!strcmp(p,"2") || !strcmp(p,"net"))
-    			{
-    			    CFG_SetConId(2);
-    			}
+                else if (!strcmp(p,"2") || !strcmp(p,"net"))
+                {
+                    CFG_SetConId(2);
+                }
 #endif
-    			else
-    			{
-    			    CON_printf("dbg   : set con=0\n");
+                else
+                {
+                    CON_printf("dbg   : set con=0\n");
 #if HAS_USB == 1
 #if HAS_CDC == 1
-    			    CON_printf("usb   : set con=1\n");
+                    CON_printf("usb   : set con=1\n");
 #endif
 #endif
 #if HAS_NET == 1
-    			    CON_printf("net   : set con=2\n");
+                    CON_printf("net   : set con=2\n");
 #endif
-    			}
+                }
 
-    		}
-    		CON_printf("con=%s\n",ConIdToStr(CFG_GetConId()));
-    	}
+            }
+            CON_printf("con=%s\n",ConIdToStr(CFG_GetConId()));
+        }
         else if (!strcmp(p,"?"))
         {
             usage();
@@ -686,11 +686,11 @@ int Cmd_cfg(int argc, char *argv[])
             return(CMDLINE_INVALID_ARG);
         }
     }
-	else
+    else
     {
         CON_printf("dbg=%04x sap=%s rfs=%x ffs=%x hib=%x rtc=%x result=%x verb=%s con=%s sbl=%s\n", \
             CFG_GetTrace(), \
-    	    SapToStr(CFG_GetSap()), \
+            SapToStr(CFG_GetSap()), \
             CFG_GetRfs(), \
             CFG_GetFfs(), \
             CFG_GetHib(), CFG_GetRtc(), \
