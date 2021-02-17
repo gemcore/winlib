@@ -23,32 +23,32 @@
     <ProjectGuid>{5732082D-D1E5-4769-9458-FAC51E0ED00A}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>winlib</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -147,13 +147,20 @@
     <ClInclude Include="src\BASEFILE.HPP" />
     <ClInclude Include="src\CIRCBUF.HPP" />
     <ClInclude Include="src\comport.h" />
+    <ClInclude Include="src\dhara\bytes.h" />
+    <ClInclude Include="src\dhara\error.h" />
+    <ClInclude Include="src\dhara\journal.h" />
+    <ClInclude Include="src\dhara\map.h" />
+    <ClInclude Include="src\dhara\nand.h" />
     <ClInclude Include="src\GENERIC.HPP" />
     <ClInclude Include="src\LOG.H" />
     <ClInclude Include="src\SCRIPT.HPP" />
+    <ClInclude Include="src\sim.h" />
     <ClInclude Include="src\SYSERR.H" />
     <ClInclude Include="src\Thread.h" />
     <ClInclude Include="src\TIMER.H" />
     <ClInclude Include="src\TMR.H" />
+    <ClInclude Include="src\util.h" />
     <ClInclude Include="src\Utils.hpp" />
     <ClInclude Include="src\wassert.h" />
     <ClInclude Include="src\Win32Exception.hpp" />
@@ -166,10 +173,17 @@
     <ClCompile Include="src\BASEFILE.CPP" />
     <ClCompile Include="src\CIRCBUF.CPP" />
     <ClCompile Include="src\comport.cpp" />
+    <ClCompile Include="src\dhara\error.c" />
+    <ClCompile Include="src\dhara\journal.c" />
+    <ClCompile Include="src\dhara\map.c" />
     <ClCompile Include="src\LOG.CPP" />
+    <ClCompile Include="src\main_map.c" />
+    <ClCompile Include="src\main_nand.c" />
     <ClCompile Include="src\SCRIPT.CPP" />
+    <ClCompile Include="src\sim.c" />
     <ClCompile Include="src\TIMER.CPP" />
     <ClCompile Include="src\TMR.CPP" />
+    <ClCompile Include="src\util.c" />
     <ClCompile Include="src\Utils.cpp" />
     <ClCompile Include="src\Win32Exception.cpp" />
     <ClCompile Include="stdafx.cpp" />

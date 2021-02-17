@@ -13,6 +13,12 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Source Files\dhara">
+      <UniqueIdentifier>{4f9dd7c5-9e48-46ac-afb7-c108e0df646d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\tests">
+      <UniqueIdentifier>{9e42d048-3fd8-4e7b-9e7a-c639634d8cb4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -72,6 +78,27 @@
     <ClInclude Include="src\LOG.H">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\dhara\bytes.h">
+      <Filter>Source Files\dhara</Filter>
+    </ClInclude>
+    <ClInclude Include="src\dhara\error.h">
+      <Filter>Source Files\dhara</Filter>
+    </ClInclude>
+    <ClInclude Include="src\dhara\journal.h">
+      <Filter>Source Files\dhara</Filter>
+    </ClInclude>
+    <ClInclude Include="src\dhara\map.h">
+      <Filter>Source Files\dhara</Filter>
+    </ClInclude>
+    <ClInclude Include="src\dhara\nand.h">
+      <Filter>Source Files\dhara</Filter>
+    </ClInclude>
+    <ClInclude Include="src\sim.h">
+      <Filter>Source Files\tests</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util.h">
+      <Filter>Source Files\tests</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -109,6 +136,27 @@
     </ClCompile>
     <ClCompile Include="src\LOG.CPP">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dhara\error.c">
+      <Filter>Source Files\dhara</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dhara\journal.c">
+      <Filter>Source Files\dhara</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dhara\map.c">
+      <Filter>Source Files\dhara</Filter>
+    </ClCompile>
+    <ClCompile Include="src\sim.c">
+      <Filter>Source Files\tests</Filter>
+    </ClCompile>
+    <ClCompile Include="src\util.c">
+      <Filter>Source Files\tests</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main_map.c">
+      <Filter>Source Files\tests</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main_nand.c">
+      <Filter>Source Files\tests</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

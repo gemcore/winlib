@@ -24,9 +24,10 @@
 #define DEBUG(...)
 
 //#define RUN_TESTING
-//#define COM_TESTING
+#define COM_TESTING
 //#define TMR_TESTING
-#define MDM_TESTING
+//#define MDM_TESTING
+//#define FTL_TESTING
 
 /* xScript Rx initial timeout maximum value. */
 #define TMR_TIMEOUT_MAX	32000
@@ -1844,7 +1845,7 @@ char qflag = 0;  						// quiet mode
 int main(int argc, char *argv[])
 {
 	// Open log file to capture output from putchar, puts and printf macros.
-	LOG_Init("c:\\temp\\winlib.log");
+	LOG_Init(NULL);
 
 	TMR_Init(100);	// 100ms timebase
 	COM_Init(3, 115200);
@@ -1881,31 +1882,73 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef COM_TESTING
+char qflag = 0;  						// quiet mode off (output to window)
+
+unsigned char buf[80];
+
+//unsigned char HCI_Reset[] = { 0x03, 0xC0, 0x00 };
+
+unsigned char NMP_ImageList[] = { 0x06, 0x09, 0x41, 0x41, 0x73, 0x41, 0x41, 0x41, 0x41, 0x42, 0x41, 0x41, 
+								  0x46, 0x43, 0x41, 0x4B, 0x44, 0x31, 0x4D, 0x77, 0x3D, 0x3D, 0x0A };
+
 int main(int argc, char *argv[])
 {
-	TMR_Init(100);	// 100ms timebase
-	COM_Init(3,115200);
+	// Open log file to capture output from putchar, puts and printf macros.
+	LOG_Init(NULL);
 
-	unsigned char buf[80];
-	com.Write("AT\r", 3);
-	com.Sleep(2000);
-	int n = com.Read((LPSTR)buf, sizeof(buf));
-	if (n > 0)
+	TMR_Init(100);	// 100ms timebase
+	COM_Init(26,115200);
+
+	int n;
+	//n = sizeof(HCI_Reset);
+	//memcpy(buf, HCI_Reset, n);
+	n = sizeof(NMP_ImageList);
+	memcpy(buf, NMP_ImageList, n);
+
+	com->Write((LPSTR)buf, n);
+	int count = 100;
+	bool done = false;
+	while (!done && count > 0)
 	{
-		for (int i = 0; i < n; i++)
+		n = com->RxCount();
+		if (n > 0)
 		{
-			printf("%c", buf[i]);
+			for (int i=0; i < n; i++)
+			{
+				int c;
+				c = com->RxGetch();
+				if (isprint(c))
+				{
+					printf("%c", c);
+				}
+				else
+				{
+					printf("[%02x]", c);
+				}
+				if (c == 0x0D)
+				{
+					done = true;
+					break;
+				}
+			}
 		}
-		putchar('\n');
+		com->Sleep(50);
+		count--;
 	}
+	putchar('\n');
 	COM_Term();
 	TMR_Term();
+
+	// Close capture log file.
+	LOG_Term();
 
 	return 0;
 }
 #endif
 
 #ifdef TMR_TESTING
+char qflag = 0;  						// quiet mode off (output to window)
+
 class ATmr : CTimerFunc
 {
 	void Func(void)
@@ -1918,6 +1961,9 @@ ATmr atmr;
 
 int main(int argc, char *argv[])
 {
+	// Open log file to capture output from putchar, puts and printf macros.
+	LOG_Init(NULL);
+
 	TMR_Init(100);	// 100ms timebase
 
 	printf("\nset 1 second timer ");
@@ -1941,6 +1987,29 @@ int main(int argc, char *argv[])
 
 	TMR_Term();
 	
+	// Close capture log file.
+	LOG_Term();
+
 	return 0;
 }
+#endif
+
+#ifdef FTL_TESTING
+char qflag = 0;  						// quiet mode off (output to window)
+
+extern "C" int main_map(void);
+
+int main(int argc, char *argv[])
+{
+	// Capture output from putchar, puts and printf macros.
+	LOG_Init(NULL);
+	printf("\ntesting ");
+
+	main_map();
+
+	// Close capture log file.
+	LOG_Term();
+	return 0;
+}
+
 #endif

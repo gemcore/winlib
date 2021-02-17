@@ -625,7 +625,7 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 								char szByte[3];
 								szByte[0] = *pSrc++;	// high nibble
 								szByte[1] = *pSrc++;	// low nibble
-								szByte[2] = 0;
+								szByte[2] = '\0';
 
 								if (!isxdigit(szByte[0]) || !isxdigit(szByte[1]))
 								{
@@ -639,7 +639,7 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 							}
 						}
 					}
-					*pDest = 0;
+					*pDest = '\0';
 				}
 				Rec[RecIndex].iType = SCRIPT_TXCHAR;
 				Rec[RecIndex].iNext = label;					// Label to jump to on errors
@@ -917,7 +917,6 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 			}
 			else  if (!strcmp(tp, sg[SCRIPT_ECHO].szKey))
 			{
-				int label = -1;
 				if ((tp = strtok(NULL, tokeol)) != NULL)
 				{
 					char *pSrc = tp;
@@ -945,7 +944,7 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 								char szByte[3];
 								szByte[0] = *pSrc++;	// high nibble
 								szByte[1] = *pSrc++;	// low nibble
-								szByte[2] = 0;
+								szByte[2] = '\0';
 
 								if (!isxdigit(szByte[0]) || !isxdigit(szByte[1]))
 								{
@@ -959,10 +958,10 @@ int SCRIPT::ReadRecFile(char *filename, SCRIPT_REC *rec, int MaxRecCnt )
 							}
 						}
 					}
-					*pDest = 0;
+					*pDest = '\0';
 				}
 				Rec[RecIndex].iType = SCRIPT_ECHO;
-				Rec[RecIndex].iNext = label;					// Label to jump to on errors
+				Rec[RecIndex].iNext = -1;
 			}
 			else  if (isdigit(*tp))
 			{

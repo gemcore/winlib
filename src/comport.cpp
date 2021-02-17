@@ -22,7 +22,7 @@
 #include "LOG.H"
 
 #undef TRACE
-#define TRACE(...)
+#define TRACE(fmt,...)	printf(fmt,__VA_ARGS__)
 
 #define ASCII_XON		DC1
 #define ASCII_XOFF		DC3
@@ -167,8 +167,10 @@ bool ComPort::Start()
    dcb.fRtsControl = RTS_CONTROL_ENABLE;
 
    // setup software flow control
-   dcb.fInX = false;
-   dcb.fOutX = false;
+   dcb.fInX = true;
+   dcb.fOutX = true;
+   //dcb.fInX = false;
+   //dcb.fOutX = false;
    dcb.XonChar = ASCII_XON;
    dcb.XoffChar = ASCII_XOFF;
    dcb.XonLim = 100;
@@ -323,9 +325,9 @@ int ComPort::Read( LPSTR lpszBlock, int nMaxLength )
                }
             }
 	      }
-         else
+         else if (LastError != ERROR_SUCCESS)
          {
-            //printf("\nRead error=%ld ",LastError);
+            printf("\nRead error=%ld ",LastError);
 
             // some other error occurred
             dwLength = 0;
@@ -410,14 +412,14 @@ bool ComPort::Write( LPSTR lpByte , DWORD dwBytesToWrite)
              printf("Probable Write Timeout\n", dwBytesSent);
          //printf("%ld bytes written\n", dwBytesSent);
       }
-      else
+      else if (LastError != ERROR_SUCCESS)
       {
-//ADG!         printf("Write error=%ld\n",LastError);
+         printf("Write error=%ld\n",LastError);
 
          // some other error occurred
          ClearCommError( id, &dwErrorFlags, &ComStat );
-//ADG!         if (dwErrorFlags > 0 && fDisplayErrors)
-//ADG!            printf( "Write error=%u\n", dwErrorFlags );
+         if (dwErrorFlags > 0 && fDisplayErrors)
+            printf( "Write error=%u\n", dwErrorFlags );
          return FALSE;
       }
    }
