@@ -28,9 +28,9 @@
 //#elif defined(WIN32) /*(predefined on MSVC)*/
 //#include <stdint.h>
 #elif defined(EMBEDDED_HOST)  /* Generic Embedded Host */
-# include <stdint.h>
+#include <stdint.h>
 
-#include "../term/bsp.h"           // board support functions
+#include "bsp.h"           // board support functions
 #ifndef WIN32
 #include "fio.h"           // stdio mapping to Flash based FATFS functions
 #include "ustdlib.h"       // standard C runtime functions

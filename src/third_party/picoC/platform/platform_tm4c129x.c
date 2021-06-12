@@ -6,8 +6,8 @@
 #define HAS_LINENOISE
 
 #ifdef HAS_LINENOISE
-#include "../../term/cli.h"
-#include "../../term/linenoise.h"
+#include "cli.h"
+#include "linenoise.h"
 
 #define PIC_PROMPT			""
 #define PIC_HISTORY_FNAME	"pic.his"
