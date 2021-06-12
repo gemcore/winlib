@@ -160,8 +160,8 @@ extern "C"
 
 extern "C"
 {
-#include "term/cli.h"
-#include "term/bsp.h"
+#include "cli.h"
+#include "bsp.h"
 
 	static void usage(void)
 	{

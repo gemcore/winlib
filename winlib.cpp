@@ -2,6 +2,7 @@
 //
 
 #define _CRTDBG_MAP_ALLOC  
+#include "stdint.h"
 #include "stdafx.h"
 #include "windows.h"
 #include "src\LOG.H"		// Capture putchar & printf output to a log file
@@ -31,6 +32,7 @@
 //#define LUA_TESTING
 //#define FTL_TESTING
 #define TED_TESTING
+//#define B64_TESTING
 
 /* xScript Rx initial timeout maximum value. */
 #define TMR_TIMEOUT_MAX	32000
@@ -40,8 +42,6 @@ ComPort *com = NULL;
 int rxpacket_len = 0;
 int rxpacket_cnt = 0;
 byte rxpacket[80];
-
-extern void MEM_Dump(unsigned char *data, int len, long base);
 
 /*
 ** ComPort virtual thread processing function.
@@ -61,6 +61,71 @@ void ComPort::Process(void)
 
 extern "C"
 {
+#ifndef TED_TESTING	//#if HAS_CLI == 0
+	#include "cli.h"
+
+	//*****************************************************************************
+	// This is the table that holds the command names, implementing functions, and
+	// brief description.
+	//*****************************************************************************
+	SHELL_COMMAND g_psShellCmds[] =
+	{
+	{ 0, 0, 0 }
+	};
+
+	int CON_kbhit()
+	{
+		return 0;
+	}
+
+	int CON_getc()
+	{
+		return -1;
+	}
+#endif
+
+	void MEM_Dump(uint8_t *data, uint16_t len, uint32_t base)
+	{
+		uint16_t i, j;
+
+		//if (!CFG_IsTrace(DFLAG_TRC))
+		//	return;
+
+		//CON_printf("MEM: @%08x len=%04x\n",data,len);
+		for (i = 0; i < len; i += 16)
+		{
+			printf(" %06x: ", base + i);
+			for (j = 0; j < 16; j++)
+			{
+				if (j != 0)
+				{
+					if (!(j % 8))
+						printf(" ");
+					if (!(j % 1))
+						printf(" ");
+				}
+				if ((i + j) < len)
+					printf("%02x", data[i + j]);
+				else
+					printf("  ");
+			}
+			printf("  ");
+			for (j = 0; j < 16 && (i + j) < len; j++)
+			{
+				if ((i + j) < len)
+				{
+					if (isprint(data[i + j]))
+						printf("%c", data[i + j]);
+					else
+						printf(".");
+				}
+				else
+					printf(" ");
+			}
+			printf("\n");
+		}
+	}
+
 	int COM_Init(int port,long baud)
 	{
 		if (com == NULL)
@@ -188,9 +253,9 @@ void xScript::Run()
 
 	while (bSuccess && pScript->GetNextRec(&rec))
 	{
-		if (log)
+		if (logger)
 		{
-			log->Flush();
+			logger->Flush();
 		}
 
 		if (_isDying)
@@ -221,12 +286,12 @@ void xScript::Run()
 				if (enable)
 				{
 					printf(",%s\n", filename);
-					log->Flush();
+					logger->Flush();
 				}
 				else
 				{
 					printf("\n> ...\n");
-					log->Flush();
+					logger->Flush();
 					LOG_Enable(enable);
 				}
 			}
@@ -1883,15 +1948,17 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef COM_TESTING
+char qflag = 0;  						// 1=quiet/0=verbose mode
+
 int main(int argc, char *argv[])
 {
 	TMR_Init(100);	// 100ms timebase
 	COM_Init(3,115200);
 
 	unsigned char buf[80];
-	com.Write("AT\r", 3);
-	com.Sleep(2000);
-	int n = com.Read((LPSTR)buf, sizeof(buf));
+	com->Write("AT\r", 3);
+	com->Sleep(2000);
+	int n = com->Read((LPSTR)buf, sizeof(buf));
 	if (n > 0)
 	{
 		for (int i = 0; i < n; i++)
@@ -1963,6 +2030,8 @@ int _main(int argc, char *argv[])
 	LOG_Term();
 	return rc;
 }
+
+char qflag = 0;  						// quiet mode
 
 int main(int argc, char *argv[])
 {
@@ -2301,59 +2370,17 @@ int CON_getc()
 	return 0;
 }
 
-#include "src/term/bsp.h"
-#include "src/term/cfg.h"
-#include "src/term/term.h"
-#include "src/term/evt.h"
-#include "src/term/cli.h"
-#include "src/term/pts.hpp"
+#include "bsp.h"
+#include "cfg.h"
+#include "term.h"
+#include "evt.h"
+#include "cli.h"
+#include "pts.hpp"
 
 extern void TRM_Init();
 extern void TRM_Term();
 extern int Cmd_ted(int argc, char *argv[]);
 extern int Cmd_pic(int argc, char *argv[]);
-
-void MEM_Dump(uint8_t *data, uint16_t len, uint32_t base)
-{
-	uint16_t i, j;
-
-	//if (!CFG_IsTrace(DFLAG_TRC))
-	//	return;
-
-	//CON_printf("MEM: @%08x len=%04x\n",data,len);
-	for (i = 0; i < len; i += 16)
-	{
-		CON_printf(" %06x: ", base + i);
-		for (j = 0; j < 16; j++)
-		{
-			if (j != 0)
-			{
-				if (!(j % 8))
-					CON_printf(" ");
-				if (!(j % 1))
-					CON_printf(" ");
-			}
-			if ((i + j) < len)
-				CON_printf("%02x", data[i + j]);
-			else
-				CON_printf("  ");
-		}
-		CON_printf("  ");
-		for (j = 0; j < 16 && (i + j) < len; j++)
-		{
-			if ((i + j) < len)
-			{
-				if (isprint(data[i + j]))
-					CON_printf("%c", data[i + j]);
-				else
-					CON_printf(".");
-			}
-			else
-				CON_printf(" ");
-		}
-		CON_printf("\n");
-	}
-}
 
 //*****************************************************************************
 // This function implements the "help" command.  It prints a list of available
@@ -2376,6 +2403,14 @@ int Cmd_help(int argc, char *argv[])
 		// Advance to the next entry in the table.
 		psEntry++;
 	}
+	return(0);
+}
+
+bool exit_flag = false;
+
+int Cmd_exit(int argc, char *argv[])
+{
+	exit_flag = true;
 	return(0);
 }
 
@@ -2402,6 +2437,7 @@ SHELL_COMMAND g_psShellCmds[] =
 #endif
 { "ed",         Cmd_ted,        "text editor" },
 { "pic",        Cmd_pic,        "pico C" },
+{ "exit",       Cmd_exit,       "exit" },
 { 0, 0, 0 }
 };
 
@@ -2422,7 +2458,7 @@ int main(int argc, char *argv[])
 	// Capture output from putchar, puts and printf macros.
 	LOG_Init("c:\\temp\\term.log");
 	BSP_Init();
-	TMR_Init(100);	// 100ms timebase
+	TMR_Init(SYSTICK_RATE_HZ);	// 100Hz timebase
 
 	SysTick *Tick = new SysTick();
 	TMR_Event(1, (CTimerEvent *)Tick, PERIODIC);
@@ -2469,6 +2505,9 @@ int main(int argc, char *argv[])
 	while (PTS_GetTaskCnt() > 0)
 	{
 		PTS_Process();
+
+		if (exit_flag)
+			break;
 	}
 #endif
 
@@ -2485,4 +2524,24 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
+#endif
+
+#ifdef B64_TESTING
+char qflag = 0;  						// quiet mode off (output to window)
+
+extern "C" int main_map(void);
+
+int main(int argc, char *argv[])
+{
+	// Capture output from putchar, puts and printf macros.
+	LOG_Init("c:\\temp\\winlib.log");
+	printf("\nFTL Testing ");
+
+	
+
+	// Close capture log file.
+	LOG_Term();
+	return 0;
+}
+
 #endif

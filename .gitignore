@@ -7,6 +7,10 @@
 *.userosscache
 *.sln.docstates
 
+*.his
+*.zar
+src/dhara/
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
