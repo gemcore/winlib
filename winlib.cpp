@@ -19,11 +19,21 @@
 #endif
 
 #undef TRACE
-#define TRACE(fmt,...)	printf(fmt,__VA_ARGS__)
+#define TRACE(fmt,...) do { if (dflag) printf(fmt,__VA_ARGS__); } while(0)
+//#define TRACE(...)
 #undef DEBUG
 #define DEBUG(...)
 
+extern void MEM_Dump(unsigned char* data, int len, long base);
+
+int dflag = true;
+
+#undef MEM_Trace
+#define MEM_Trace(data,len,base) do { if (dflag) MEM_Dump(data,len,base); } while(0)
+//#define MEM_Trace(fmt,...)
+
 //#define RUN_TESTING
+//#define CBOR_TESTING
 #define COM_TESTING
 //#define TMR_TESTING
 //#define MDM_TESTING
@@ -37,8 +47,6 @@ ComPort *com = NULL;
 int rxpacket_len = 0;
 int rxpacket_cnt = 0;
 byte rxpacket[80];
-
-extern void MEM_Dump(unsigned char *data, int len, long base);
 
 /*
 ** ComPort virtual thread processing function.
@@ -1148,7 +1156,7 @@ int _main(int argc, char *argv[])
 				SCRIPT_RECDATA *d = (SCRIPT_RECDATA *)r->pData;
 				if (d->bArray[0] != 0x00)
 				{
-					//MEM_Dump((unsigned char *)d->iArray, r->iLen, 0L);
+					//MEM_Trace((unsigned char *)d->iArray, r->iLen, 0L);
 					printf("var 2:");
 					//for (int i = 0; i < 5; i++)
 					//{
@@ -1881,63 +1889,132 @@ int main(int argc, char *argv[])
 }
 #endif
 
-#ifdef COM_TESTING
+#ifdef CBOR_TESTING
+#include <stdio.h>
+#include "src/cbor/cbor.h"
+
 char qflag = 0;  						// quiet mode off (output to window)
 
-unsigned char buf[80];
-
-//unsigned char HCI_Reset[] = { 0x03, 0xC0, 0x00 };
-
-unsigned char NMP_ImageList[] = { 0x06, 0x09, 0x41, 0x41, 0x73, 0x41, 0x41, 0x41, 0x41, 0x42, 0x41, 0x41, 
-								  0x46, 0x43, 0x41, 0x4B, 0x44, 0x31, 0x4D, 0x77, 0x3D, 0x3D, 0x0A };
-
-int main(int argc, char *argv[])
+int main(int argc, char** argv)
 {
+	unsigned char buffer[512];
+	unsigned int size = 512;
+	unsigned char* data = buffer;
+
 	// Open log file to capture output from putchar, puts and printf macros.
 	LOG_Init(NULL);
 
-	TMR_Init(100);	// 100ms timebase
-	COM_Init(26,115200);
+	unsigned char* p;
+	int i;
 
-	int n;
-	//n = sizeof(HCI_Reset);
-	//memcpy(buf, HCI_Reset, n);
-	n = sizeof(NMP_ImageList);
-	memcpy(buf, NMP_ImageList, n);
+	printf("map(%d):\n", 1);
+	p = cbor_write_map(data, size, 1);
+	i = p-data;
+	MEM_Trace(data, i, 0L);
+	data = p;
 
-	com->Write((LPSTR)buf, n);
-	int count = 100;
-	bool done = false;
-	while (!done && count > 0)
-	{
-		n = com->RxCount();
-		if (n > 0)
-		{
-			for (int i=0; i < n; i++)
-			{
-				int c;
-				c = com->RxGetch();
-				if (isprint(c))
-				{
-					printf("%c", c);
-				}
-				else
-				{
-					printf("[%02x]", c);
-				}
-				if (c == 0x0D)
-				{
-					done = true;
-					break;
-				}
-			}
+	printf("text(%s):\n", "foo");
+	p = cbor_write_text(data, size, "foo");
+	i = p - data;
+	MEM_Trace(data, i, 0L);
+	data = p;
+
+	printf("int(%d):\n", 1234);
+	p = cbor_write_int(data, size, 1234);
+	i = p - data;
+	MEM_Trace(data, i, 0L);
+	data = p;
+
+	p = cbor_write_array(data, size, 5);
+	i = p - data;
+	MEM_Trace(data, i, 0L);
+	data = p;
+
+	printf("int(%d):\n", 123);
+	p = cbor_write_int(data, size, 123);
+	i = p - data;
+	MEM_Trace(data, i, 0L);
+	data = p;
+
+	printf("text(%s):\n", "hello");
+	p = cbor_write_text(data, size, "hello");
+	i = p - data;
+	MEM_Trace(data, i, 0L);
+	data = p;
+
+	printf("text(%s):\n", "world");
+	p = cbor_write_text(data, size, "world");
+	i = p - data;
+	MEM_Trace(data, i, 0L);
+	data = p;
+
+	printf("long(%d):\n", 12312312311ULL);
+	p = cbor_write_long(data, size, 12312312311ULL);
+	i = p - data;
+	MEM_Trace(data, i, 0L);
+	data = p;
+
+	printf("text(%s):\n", "f:D");
+	p = cbor_write_text(data, size, ":D");
+	i = p - data;
+	MEM_Trace(data, i, 0L);
+	data = p;
+
+	unsigned int offset = 0;
+	struct cbor_token token;
+	while (1) {
+		offset = cbor_read_token(buffer, data - buffer, offset, &token);
+
+		if (token.type == CBOR_TOKEN_TYPE_INCOMPLETE) {
+			printf("INCOMPLETE\n");
+			break;
 		}
-		com->Sleep(50);
-		count--;
+
+		if (token.type == CBOR_TOKEN_TYPE_ERROR) {
+			printf("ERROR: %s\n", token.error_value);
+			break;
+		}
+
+		if (token.type == CBOR_TOKEN_TYPE_INT) {
+			printf("int %s%u\n", token.sign < 0 ? "-" : "", token.int_value);
+			continue;
+		}
+
+		if (token.type == CBOR_TOKEN_TYPE_LONG) {
+			printf("long %s%llu\n", token.sign < 0 ? "-" : "", token.long_value);
+			continue;
+		}
+
+		if (token.type == CBOR_TOKEN_TYPE_ARRAY) {
+			printf("array %u\n", token.int_value);
+			continue;
+		}
+
+		if (token.type == CBOR_TOKEN_TYPE_MAP) {
+			printf("map %u\n", token.int_value);
+			continue;
+		}
+
+		if (token.type == CBOR_TOKEN_TYPE_TAG) {
+			printf("tag %u\n", token.int_value);
+			continue;
+		}
+
+		if (token.type == CBOR_TOKEN_TYPE_SPECIAL) {
+			printf("special %u\n", token.int_value);
+			continue;
+		}
+
+		if (token.type == CBOR_TOKEN_TYPE_STRING) {
+			printf("text '%.*s'\n", token.int_value, token.text_value);
+			continue;
+		}
+
+		if (token.type == CBOR_TOKEN_TYPE_BYTES) {
+			printf("bytes with size %u\n", token.int_value);
+			continue;
+		}
 	}
-	putchar('\n');
-	COM_Term();
-	TMR_Term();
 
 	// Close capture log file.
 	LOG_Term();
@@ -1959,7 +2036,7 @@ class ATmr : CTimerFunc
 
 ATmr atmr;
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
 	// Open log file to capture output from putchar, puts and printf macros.
 	LOG_Init(NULL);
@@ -1977,16 +2054,16 @@ int main(int argc, char *argv[])
 	printf("done\n");
 
 	printf("periodic heartbeat ");
-	TMR_Event(5, (CTimerEvent *)&atmr, PERIODIC);
+	TMR_Event(5, (CTimerEvent*)&atmr, PERIODIC);
 	TMR_Delay(20);
 	printf("2 seconds ");
 	TMR_Delay(50);
 	printf("5 seconds ");
-	TMR_Event(0, (CTimerEvent *)&atmr, PERIODIC);
+	TMR_Event(0, (CTimerEvent*)&atmr, PERIODIC);
 	putchar('\n');
 
 	TMR_Term();
-	
+
 	// Close capture log file.
 	LOG_Term();
 
@@ -1999,7 +2076,7 @@ char qflag = 0;  						// quiet mode off (output to window)
 
 extern "C" int main_map(void);
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
 	// Capture output from putchar, puts and printf macros.
 	LOG_Init(NULL);
@@ -2011,25 +2088,1090 @@ int main(int argc, char *argv[])
 	LOG_Term();
 	return 0;
 }
-
 #endif
 
-#ifdef FTL_TESTING
+#ifdef COM_TESTING
+#include "src/base64/base64.h"
+#include "src/cbor/cbor.h"
+#include "src/BASEFILE.HPP"
+
+#define BUFSIZE		512
+
+//extern "C" void init_crctable();
+//extern "C" unsigned int crc16_buf(unsigned char* bufptr, int buflen, unsigned int crc);
+extern "C" uint16_t crc_xmodem(const unsigned char* input_str, size_t num_bytes);
+
 char qflag = 0;  						// quiet mode off (output to window)
 
-extern "C" int main_nand(void);
+unsigned char buf[1024];
+unsigned char dec_buf[1024];
+char          enc_str[1024];
 
-int main(int argc, char *argv[])
+//unsigned char Cmd_ImageList[] = { 
+//	0x00,0x0b,0x00,0x00,0x00,0x01,0x00,0x01, 0x42,0x00,0xa0,0xf5,0x33 };
+
+//unsigned char Cmd_Reset[]     = { 
+//	0x00,0x0b,0x02,0x00,0x00,0x01,0x00,0x00, 0x42,0x05,0xa0,0xba,0x15 };
+
+unsigned char bytes_sha[32] = {
+	0x6c,0x5a,0x2b,0x11,0x0d,0xdc,0xc0,0xa2, 0x91,0xf0,0xd0,0x6c,0xa0,0x0d,0x2f,0xb0,
+	0xe9,0x4c,0x63,0x10,0x0a,0x00,0x72,0x14, 0x12,0xe3,0xff,0xc0,0x35,0xd0,0xbe,0x2f };
+
+int recv_buf(int count, int ch)
 {
-	// Capture output from putchar, puts and printf macros.
-	LOG_Init(NULL);
-	printf("\ntesting ");
+	int i = 0;
+	int delay = 50;
+	bool done = false;
+	TRACE("recv_buf(%d, %d){\n", count, ch);
+	while (!done && count > 0)
+	{
+		int n = com->RxCount();
+		if (n > 0)
+		{
+			for (int i=0; i < n && count > 0; i++, count--)
+			{
+				int c;
+				c = com->RxGetch();
+				if (isprint(c))
+				{
+					TRACE("%c", c);
+				}
+				else if (c != -1 && c == ch)
+				{
+					TRACE("<CR>");
+					done = true;
+					break;
+				}
+				else
+				{
+					TRACE("[%02x]", c);
+				}
+				buf[i] = c;
+			}
+			if (!done && count > 0)
+			{
+				delay = 5;
+				com->Sleep(1);
+			}
+		}
+		else
+		{
+			com->Sleep(1);
+			if (--delay <= 0)
+			{
+				done = true;
+			}
+		}
+	}
+	TRACE("} return count=%d\n", count);
+	return count;
+}
 
-	main_nand();
+void send_buf(unsigned char *buf, int n)
+{
+	//MEM_Trace(buf, n, 0L);
+	if (!com->Write((LPSTR)buf, n))
+	{
+		printf("send_buf: Write error!\n");
+	}
+	com->Sleep(1);
+}
 
-	// Close capture log file.
-	LOG_Term();
+/* NLIP packets sent over serial are fragmented into frames of 127 bytes or
+ * fewer. This 127-byte maximum applies to the entire frame, including header,
+ * CRC, and terminating newline.
+ */
+#define MGMT_NLIP_MAX_FRAME     127
+
+class CBOR
+{
+public:
+	unsigned char *bfr;
+	unsigned char* p;
+	unsigned char* q;
+	long base;
+	int size;
+
+	CBOR(unsigned char* buf, int n)
+	{
+		bfr = buf;
+		base = 0L;
+		size = n;
+		q = bfr;
+		//TRACE("bfr @%xH size=%d\n", bfr, size);
+	}
+
+	void put_map(int n)
+	{
+		TRACE(" map %d\n", n);
+		p = cbor_write_map(q, size - base, n);
+		MEM_Trace(q, p - q, base);
+		base += p - q;
+		q = p;
+	}
+
+	void put_text(char* s)
+	{
+		TRACE(" text '%s'\n", s);
+		p = cbor_write_text(q, size - base, s);
+		MEM_Trace(q, p - q, base);
+		base += p - q;
+		q = p;
+	}
+
+	void put_bytes(unsigned char* bytes, int m)
+	{
+		TRACE(" bytes[%d]\n", m);
+		p = cbor_write_bytes(q, size - base, bytes, m);
+		MEM_Trace(q, p - q, base);
+		base += p - q;
+		q = p;
+	}
+
+	void put_int(int n)
+	{
+		TRACE(" int %d\n", n);
+		p = cbor_write_int(q, size - base, n);
+		MEM_Trace(q, p - q, base);
+		base += p - q;
+		q = p;
+	}
+
+	~CBOR()
+	{
+		//TRACE("bfr len=%d:\n", base);
+	}
+};
+
+int token_cnt = 0;
+cbor_token_t tokens[16];
+
+unsigned int cbor_parse(unsigned char* data, int size)
+{
+	unsigned int offset = 0;
+	token_cnt = 0;
+	while (1)
+	{
+		cbor_token_t *token = &tokens[token_cnt++];
+
+		offset = cbor_read_token(data, size, offset, token);
+
+		if (token->type == CBOR_TOKEN_TYPE_INCOMPLETE) {
+			TRACE(" incomplete\n");
+			break;
+		}
+		if (token->type == CBOR_TOKEN_TYPE_ERROR) {
+			TRACE(" error: %s\n", token->error_value);
+			break;
+		}
+		if (token->type == CBOR_TOKEN_TYPE_BREAK) {
+			TRACE(" break\n");
+			continue;
+		}
+		if (token->type == CBOR_TOKEN_TYPE_INT) {
+			TRACE(" int %s%u\n", token->sign < 0 ? "-" : "", token->int_value);
+			continue;
+		}
+		if (token->type == CBOR_TOKEN_TYPE_LONG) {
+			TRACE(" long %s%llu\n", token->sign < 0 ? "-" : "", token->long_value);
+			continue;
+		}
+		if (token->type == CBOR_TOKEN_TYPE_ARRAY) {
+			if (token->int_value == 31)
+				TRACE(" array *\n");
+			else
+				TRACE(" array %u\n", token->int_value);
+			continue;
+		}
+		if (token->type == CBOR_TOKEN_TYPE_MAP) {
+			if (token->int_value == 31)
+				TRACE(" map *\n");
+			else
+				TRACE(" map %u\n", token->int_value);
+			continue;
+		}
+		if (token->type == CBOR_TOKEN_TYPE_TAG) {
+			TRACE(" tag %u\n", token->int_value);
+			continue;
+		}
+		if (token->type == CBOR_TOKEN_TYPE_SPECIAL) {
+			TRACE(" special %u\n", token->int_value);
+			continue;
+		}
+		if (token->type == CBOR_TOKEN_TYPE_TEXT) {
+			TRACE(" text '%.*s'\n", token->int_value, token->text_value);
+			continue;
+		}
+		if (token->type == CBOR_TOKEN_TYPE_BYTES) {
+			TRACE(" bytes[%u]\n", token->int_value);
+			MEM_Trace(token->bytes_value, token->int_value, 0);
+			continue;
+		}
+	}
+
+	return offset;
+}
+
+typedef struct nmp_hdr
+{
+	unsigned char Op;
+	unsigned char Flags;
+	unsigned short Len;
+	unsigned short Group;
+	unsigned char Seq;
+	unsigned char Id;
+} nmp_hdr_t;
+
+typedef struct nmp_packet
+{
+	nmp_hdr_t hdr;
+	unsigned char data[0];
+} nmp_packet_t;
+
+#define swapbytes(n)	((n&0xFF)<<8)+(n>>8)
+
+unsigned int total_len = 62956;
+unsigned char seq = 0x42;
+
+void TraceNmpHdr(nmp_hdr_t* hdr)
+{
+	MEM_Trace((unsigned char*)hdr, sizeof(nmp_hdr_t), 2L);
+	TRACE("nmp_hdr: Op:%d Flags:%d Len:%d Group:%d Seq:%d Id:%d\n",
+		hdr->Op, hdr->Flags, swapbytes(hdr->Len), swapbytes(hdr->Group), hdr->Seq, hdr->Id);
+}
+
+void recv_nmp_resp(void)
+{
+#ifdef SEND_IMAGE
+	uint16_t len;
+	if (recv_buf(2, -1) != 0)
+	{
+		printf("resp: timeout!");
+		return;
+	}
+	TRACE("rx: %02x %02x\n", buf[0], buf[1]);
+	// Receive remainder of packet:
+	len = 50 - recv_buf(50, '\r');
+	strncpy(enc_str, (char*)&buf[0], len);
+	enc_str[len] = '\0';
+	TRACE("rx: '%s'\n", enc_str);
+	int m;
+	m = base64_decode_len(enc_str);
+	m = base64_decode(enc_str, dec_buf);
+	MEM_Trace(dec_buf, m, 0L);
+	// NMP header (8-bytes):
+	len = swapbytes(*(uint16_t*)&dec_buf[0]);
+	TRACE("nmp len=%04x\n", len);
+	nmp_hdr_t* hdr = (nmp_hdr_t*)&dec_buf[2];
+	len = swapbytes(hdr->Len);
+	TRACE("hdr len=%04x\n", len);
+	TraceNmpHdr(hdr);
+	unsigned int offset = cbor_parse(&dec_buf[2 + 8], len);
+	unsigned int remaining = len - 8 - offset;
+	TRACE("remaining=%x ", remaining);
+	//uint16_t crc = swapbytes(*(uint16_t *)&dec_buf[2 + 8 + offset]);
+	uint16_t crc = swapbytes(*(uint16_t *)&dec_buf[m - 2]);
+	TRACE("offset=%x\n", offset);
+	TRACE("crc=%04x\n", crc);
+#endif
+}
+
+void InitNmpHdr(nmp_hdr_t* hdr, uint8_t Op, uint8_t Flags, uint16_t Len, uint16_t Group, uint8_t Seq, uint8_t Id)
+{
+	hdr->Op = Op;
+	hdr->Flags = Flags;
+	hdr->Len = swapbytes(Len);
+	hdr->Group = swapbytes(Group);
+	hdr->Seq = Seq;
+	hdr->Id = Id;
+	TraceNmpHdr(hdr);
+}
+
+typedef struct nlip_hdr
+{
+	uint8_t type[2];
+} nlip_hdr_t;
+
+// Receive nmp packets
+/*
+	offset 0:    0x06 0x09
+	== = Begin base64 encoding == =
+	offset 2 : <16 - bit packet - length>
+	offset ? : <body>
+	offset ? : <crc16> (if final frame)
+	== = End base64 encoding == =
+	offset ? : 0x0a (newline)
+
+	All subsequent frames have the following format :
+
+	offset 0:    0x04 0x14
+	== = Begin base64 encoding == =
+	offset 2 : <body>
+	offset ? : <crc16> (if final frame)
+	== = End base64 encoding == =
+	offset ? : 0x0a (newline)
+*/
+void recv_packets(unsigned char *data, int size)
+{
+	long count = 0;		// NMP packet counter
+	long j = 0;			// file data[] offset
+	long k = 0;			// accumulated decoded base64 data offset in buf[]
+	unsigned int len;
+	BASEFILE bf;
+
+	TRACE("recv_packets()\n");
+	bf.InitWriteFile("recv.img");
+
+	while (j <= size)
+	{
+		MEM_Trace(&data[j], 515, 0L);
+		count++;	// increment count of packets
+		TRACE("rx packet #%d\n", count);
+		do
+		{
+			bool flag;
+			nlip_hdr_t* nlip_hdr = (nlip_hdr_t*)&data[j];
+			TRACE("rx: %02x %02x\n", nlip_hdr->type[0], nlip_hdr->type[1]);
+			if (nlip_hdr->type[0] == 0x06 && nlip_hdr->type[1] == 0x09)
+			{
+				flag = true;	// Initial frame
+				TRACE("Initial frame\n");
+			}
+			else if (nlip_hdr->type[0] == 0x04 && nlip_hdr->type[1] == 0x14)
+			{
+				flag = false;	// Continuation frame
+				TRACE("Continuation frame\n");
+			}
+			else
+			{
+				printf("Bad NLIP header type bytes!\n");
+			}
+			j += sizeof(nlip_hdr_t);
+			// Begin base64 encoding
+			unsigned char *ptr = &data[j];
+			int i = 0;
+			while (data[j+i] != 0x0a)
+			{
+				i++;
+			}
+			strncpy(enc_str, (char*)&data[j], i);
+			enc_str[i] = '\0';
+			j += i;
+			// End base64 encoding
+			TRACE("rx: '%s'\n", enc_str);
+			j += 1;
+			TRACE("rx: <LF>\n");
+			int m;
+			m = base64_decode_len(enc_str);
+			m = base64_decode(enc_str, dec_buf);
+			MEM_Trace(dec_buf, m, 0L);
+			// Accumulate the decoded base64 data in buf[].
+			memcpy(&buf[k], dec_buf, m);
+			k += m;
+			if (flag == true)
+			{
+				// NMP total length of decoded packet data (in CBOR format) (2-bytes)
+				len = swapbytes(*(uint16_t*)&dec_buf[0]);
+				TRACE("nmp len=%04x\n", len);
+				// NMP header (8-bytes)
+				nmp_hdr_t* hdr = (nmp_hdr_t*)&dec_buf[2];
+				TRACE("hdr len=%04x\n", swapbytes(hdr->Len));
+				TraceNmpHdr(hdr);
+			}
+		}
+		while (k < len);
+
+		// Parse NMP packet payload as CBOR data map.
+		MEM_Trace(buf, len, 0L);
+		unsigned int offset = cbor_parse(&buf[10], len-2-8);
+		unsigned int remaining = len - 8 - offset;
+		TRACE("remaining=%x ", remaining);
+		uint16_t crc = swapbytes(*(uint16_t*)&buf[len - 2]);
+		TRACE("offset=%x\n", offset);
+		TRACE("crc=%04x\n", crc);
+
+		bf.WritetoFile((DWORD)len, (BYTE*)buf);
+	}
+
+	bf.CloseFile();
+	TRACE("recv_packets done\n");
+}
+
+// Transmit a nmp packet request
+int send_nmp_packet(unsigned int offset, int nbytes, unsigned char* bytes_data)
+{
+	printf("send_nmp_packet offset=%04x nbytes=%x\n", offset, nbytes);
+	// Start of CBOR encoded data:
+	CBOR cbor(&buf[2 + sizeof(nmp_hdr_t)], sizeof(buf) - 2 - sizeof(nmp_hdr_t));
+	cbor.put_map(5);
+	cbor.put_text("data");
+	cbor.put_bytes(&bytes_data[offset], nbytes); // size of data (in bytes);
+	cbor.put_text("image");
+	cbor.put_int(0);
+	if (offset == 0)
+	{
+		cbor.put_text("len");
+		cbor.put_int(total_len);
+	}
+	cbor.put_text("off");
+	cbor.put_int(offset);
+	if (offset == 0)
+	{
+		cbor.put_text("sha");
+		cbor.put_bytes(bytes_sha, sizeof(bytes_sha));
+	}
+	int base = cbor.base;
+
+	// NMP packet length (2-bytes):
+	*(uint16_t*)&buf[0] = swapbytes(base + sizeof(nmp_hdr_t) + 2);
+	MEM_Trace(&buf[0], sizeof(uint16_t), 0L);
+	// NMP packet header (8-bytes):
+	nmp_hdr_t* hdr = (nmp_hdr_t*)&buf[2];
+	InitNmpHdr(hdr, 0x02, 0x0, base, 0x0001, seq, 0x01);
+	// NMP packet CRC16 (2-bytes):
+	unsigned int crc = 0;
+	//crc = crc16_buf(&buf[2],base+sizeof(nmp_hdr_t), crc);
+	crc = crc_xmodem(&buf[2], base+sizeof(nmp_hdr_t));
+	TRACE("crc16: %04x\n", crc);
+	*(uint16_t *)cbor.p = swapbytes(crc);
+	int len = 2 + sizeof(nmp_hdr_t) + base + 2;
+	MEM_Trace(buf, len, 0L);
+	// Send NMP packet with NLIP protocol.
+	base = base64_encode(buf, len, enc_str, 1);
+	TRACE("enc len=%d:\n", base);
+	MEM_Trace((unsigned char*)enc_str, base, 0L);
+	unsigned char *ptr = buf;
+	int j = 0;
+	for (int i=0,k=MGMT_NLIP_MAX_FRAME-3; i < base; i+=k)
+	{
+		// Break up packet frames that are <=127 bytes:
+		if ((i+k) >= base)
+			k = base-i;
+		if (i == 0)
+		{
+			*ptr++ = 0x06;
+			*ptr++ = 0x09;
+		}
+		else
+		{
+			*ptr++ = 0x04;
+			*ptr++ = 0x14;
+		}
+		strncpy((char*)ptr, &enc_str[i], k);
+		ptr += k;
+		*ptr++ = 0x0a;
+		j += 2 + k + 1;
+	}
+#ifdef SEND_IMAGE
+	send_buf(buf, j);
+	TMR_Delay(10);
+#endif
+	MEM_Trace(buf, j, 0L);
+	seq += 1;
+	return j;
+}
+
+unsigned char *read_image(char* filename)
+{
+	BASEFILE bf;
+	long size;
+	BYTE buf[BUFSIZE];
+	int buflen;
+	bool bDone = false;
+	
+	TRACE("read_image(%s) ", filename);
+	/* Determine the size of the image file. */
+	bf.InitReadFile(filename);
+	if (!bf.IsFile())
+	{
+		printf("\nFile_Not_Found!\n");
+		return NULL;
+	}
+	size = bf.Filesize();
+	printf("size=%08x bytes\n", size);
+	unsigned char* data = new unsigned char[size];
+	if (data == NULL)
+	{
+		printf("\nOut of memory!\n");
+		return NULL;
+	}
+
+	long j = 0;
+	while (size)
+	{
+		if (size > BUFSIZE)
+		{
+			bf.ReadfromFile(BUFSIZE, buf);
+			memcpy(&data[j], buf, BUFSIZE);
+			size -= BUFSIZE;
+			j += BUFSIZE;
+		}
+		else
+		{
+			bf.ReadfromFile(size, buf);
+			memcpy(&data[j], buf, size);
+			size = 0;
+		}
+	}
+	TRACE("read_image done\n");
+	return data;
+}
+
+int send_hci_cmd(unsigned char* cmd, int txlen, int rxlen)
+{
+	printf("send hci cmd:\n");
+	memcpy(buf, cmd, txlen);
+	MEM_Trace(cmd, txlen, 0L);
+	send_buf(buf, txlen);
+	int n = rxlen - recv_buf(rxlen, -1);
+	printf("recv hci resp:");
+	if (n == 0)
+	{
+		printf(" Timeout!\n");
+	}
+	else
+	{
+		printf(" n=%d\n", n);
+		MEM_Trace(buf, n, 0L);
+		TMR_Delay(1);
+	}
+	return n;
+}
+
+void nmp_imagelist(void)
+{
+	unsigned char NMP_ImageList[] = {
+		0x06,0x09,0x41,0x41,0x73,0x41,0x41,0x41, 0x41,0x42,0x41,0x41,0x46,0x43,0x41,0x4B,
+		0x44,0x31,0x4D,0x77,0x3D,0x3D,0x0A };
+	send_buf(NMP_ImageList, sizeof(NMP_ImageList));
+
+	int n = 100 - recv_buf(100, '\r');
+	MEM_Trace(buf, n, 0L);
+	printf("Image List:\n");
+	int m;
+	m = base64_decode_len((const char*)&buf[2]);
+	m = base64_decode((char*)&buf[2], dec_buf);
+	MEM_Trace(dec_buf, m, 0L);
+	int len = (dec_buf[0] << 8) + dec_buf[1];
+	TRACE("nmp len=%04x\n", len);
+	struct nmp_packet* pkt = (struct nmp_packet*)&dec_buf[2];
+	nmp_hdr_t* hdr = &pkt->hdr;
+	len = swapbytes(hdr->Len);
+	TRACE("hdr len=%04x\n", len);
+	TraceNmpHdr(hdr);
+	cbor_parse(pkt->data, len);
+	TRACE("crc=%02x%02x\n", dec_buf[m - 2], dec_buf[m - 1]);
+}
+
+void nmp_reset(void)
+{
+	unsigned char NMP_Reset[] = {
+		0x06,0x09,0x41,0x41,0x73,0x43,0x41,0x41, 0x41,0x42,0x41,0x41,0x42,0x43,0x42,0x61,
+		0x43,0x36,0x46,0x51,0x3D,0x3D,0x0A };
+
+	send_buf(NMP_Reset, sizeof(NMP_Reset));
+	int n = 100 - recv_buf(100, '\r');
+	MEM_Trace(buf, n, 0L);
+	printf("Reset:\n");
+	int m;
+	m = base64_decode_len((const char*)&buf[2]);
+	m = base64_decode((char*)&buf[2], dec_buf);
+	MEM_Trace(dec_buf, m, 0L);
+	int len = (dec_buf[0] << 8) + dec_buf[1];
+	TRACE("nmp len=%04x\n", len);
+	struct nmp_packet* pkt = (struct nmp_packet*)&dec_buf[2];
+	nmp_hdr_t* hdr = &pkt->hdr;
+	len = swapbytes(hdr->Len);
+	TRACE("hdr len=%04x\n", len);
+	TraceNmpHdr(hdr);
+	cbor_parse(pkt->data, len);
+	TRACE("crc=%02x%02x\n", dec_buf[m - 2], dec_buf[m - 1]);
+	TMR_Delay(55);
+	n = 100 - recv_buf(100, -1);
+	buf[n] = '\0';
+	printf("%s", (char *)buf);
+}
+
+int check_file(char* filename)
+{
+	TRACE("check_file(%s)", filename);
+
+	BASEFILE bf;
+
+	bf.InitReadFile(filename);
+
+	if (!bf.IsFile())
+	{
+		printf("\nFile_Not_Found!\n");
+		return -1;
+	}
+	long size = bf.Filesize();
+	printf("size=%08x bytes\n", size);
+	unsigned char* data = new unsigned char[size];
+	if (data == NULL)
+	{
+		printf("\nOut of memory!\n");
+		return -2;
+	}
+
+	long n = size;
+	long j = 0;
+	while (n)
+	{
+		if (n > BUFSIZE)
+		{
+			bf.ReadfromFile(BUFSIZE, buf);
+			memcpy(&data[j], buf, BUFSIZE);
+			n -= BUFSIZE;
+			j += BUFSIZE;
+		}
+		else
+		{
+			bf.ReadfromFile(n, buf);
+			memcpy(&data[j], buf, n);
+			n = 0;
+		}
+	}
+
+	recv_packets(data, size);
+
+	delete data;
+
+	bf.CloseFile();
+	TRACE("check_file done");
 	return 0;
 }
 
+int main(int argc, char* argv[])
+{
+	// Open log file to capture output from putchar, puts and printf macros.
+	LOG_Init(NULL);
+
+	TMR_Init(100);	// 100ms timebase
+	COM_Init(26, 115200);
+	TMR_Delay(5);
+
+	//nmp_test();
+	//exit(0);
+
+#ifdef SEND_IMAGE
+	if (com->IsConnected())
+#else
+	if (0)
+#endif
+	{
+		printf("Comport is connected!\n");
+		//printf("Delay for 1 sec\n");
+		//TMR_Delay(10); 
+
+		unsigned char HCI_SetUpload[] = {
+			0x01,0x04,0xfc,0x01,0x01 };
+
+		unsigned char HCI_Reset[] = {
+			0x01,0x02,0xfc,0x00 };
+
+		int n;
+		if ((n = send_hci_cmd(HCI_SetUpload, sizeof(HCI_SetUpload), 20)) != 0 &&
+			(n = send_hci_cmd(HCI_Reset, sizeof(HCI_Reset), 40)) != 0)
+		{
+			// No specific response expected from the HCI_Reset, however the 'nmgr>' debug text 
+			// is output, once the Bootloader is ready to accept NMP requests.
+			if (!strncmp("nmgr>\n", (char*)&buf[n - 6], 6))
+			{
+				printf("Got NMP prompt\n");
+			}
+		}
+		else
+		{
+			TMR_Delay(55);
+			/* Ignore any spurious data sent from the bootloader. */
+			recv_buf(100, -1);
+			TRACE("Send <CR>\n");
+			/* Sending a <LF> can help in resynchronizing the NMP serial link. */
+			buf[0] = 0x0a;
+			send_buf(buf, 1);
+			TMR_Delay(1);
+		}
+	}
+
+	/* Dumb resource intensive way is to read the whole file into a buffer! */
+	unsigned char *data = read_image("blehci.img");
+	if (data == NULL)
+	{
+		return -1;;
+	}
+
+	/* Send NMP packets broken up into several NLIP serial chunks that have the NMP packet 
+	** total length and a header in the first chunk, followed by a CBOR encoded map and a
+	** crc16-ccitt value of the unencode packet in the last serial chunk.
+	** Note that the first NMP packet is slighly shorter to accommodate some extra CBOR 
+	** encoded values that describe the total length of the image, etc. Subsequent packets
+	** are longer and the final packet is variable based on the exact remainder needed for 
+	** the last fragment of the image.
+	*/
+	BASEFILE bf;
+	bf.InitWriteFile("send.bin");
+
+	unsigned int offset = 0;
+	int size = 0x0129;
+	int i;
+	long count = 0;
+	count++;	// increment count of packets
+	TRACE("tx packet #%d\n", count);
+	i = send_nmp_packet(offset, size, data);
+	recv_nmp_resp();
+	bf.WritetoFile((DWORD)i, (BYTE*)buf);
+
+	offset += size;
+	size = 0x0154;
+	do
+	{
+		count++;	// increment count of packets
+		TRACE("tx packet #%d\n", count);
+		i = send_nmp_packet(offset, size, data);
+		recv_nmp_resp();
+		bf.WritetoFile((DWORD)i, (BYTE*)buf);
+
+		if ((offset + size) >= total_len)
+		{
+			size = total_len - offset;
+		}
+		offset += size;
+	} 
+	while (size > 0);
+
+	bf.CloseFile();
+	delete data;
+
+	check_file("send.bin");
+
+	nmp_imagelist();
+	TMR_Delay(10);
+	nmp_reset();
+
+#ifdef TESTING
+	send_buf(buf, n);
+	recv_buf(20, -1);
+#endif
+	COM_Term();
+	TMR_Term();
+
+	// Close capture log file.
+	LOG_Term();
+
+	return 0;
+}
+
+void nmp_test(void)
+{
+	uint8_t test[] = {
+			0x41,0x58,0x55,0x43,0x41,0x41,0x46,0x72,0x41,0x41,0x46,0x43,0x41,0x61,
+			0x56,0x6B,0x5A,0x47,0x46,0x30,0x59,0x56,0x6B,0x42,0x4B,0x54,0x32,0x34,0x38,0x35,
+			0x59,0x41,0x41,0x41,0x41,0x41,0x49,0x41,0x41,0x41,0x41,0x4A,0x6A,0x30,0x41,0x41,
+			0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x51,0x41,0x48,0x41,0x41,0x41,0x41,0x41,0x41,
+			0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x42,0x49,0x50,0x6B,0x67,0x41,0x51,
+			0x42,0x56,0x49,0x51,0x45,0x41,0x56,0x79,0x45,0x42,0x41,0x41,0x41,0x41,0x41,0x41,
+			0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,
+			0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,
+			0x41,0x41,0x43,0x76,0x4F,0x41,0x45,0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,
+			0x41,0x41,0x41,0x44,0x31,0x4F,0x41,0x45,0x41,0x48,0x7A,0x6B,0x42,0x41,0x47,0x55,
+			0x68,0x41,0x51,0x42,0x6C,0x49,0x51,0x45,0x41,0x5A,0x53,0x45,0x42,0x41,0x47,0x55,
+			0x68,0x41,0x51,0x42,0x6C,0x49,0x51,0x45,0x41,0x5A,0x53,0x45,0x42,0x41,0x47,0x55,
+			0x68,0x41,0x51,0x42,0x6C,0x49,0x51,0x45,0x41,0x5A,0x53,0x45,0x42,0x41,0x47,0x55,
+			0x68,0x41,0x51,0x42,0x6C,0x49,0x51,0x45,0x41,0x5A,0x53,0x45,0x42,0x41,0x47,0x55,
+			0x68,0x41,0x51,0x42,0x6C,0x49,0x51,0x45,0x41,0x5A,0x53,0x45,0x42,0x41,0x47,0x55,
+			0x68,0x41,0x51,0x42,0x6C,0x49,0x51,0x45,0x41,0x5A,0x53,0x45,0x42,
+			0x41,0x47,0x55,0x68,0x41,0x51,0x42,0x6C,0x49,0x51,0x45,0x41,0x5A,0x53,0x45,0x42,
+			0x41,0x47,0x55,0x68,0x41,0x51,0x42,0x6C,0x49,0x51,0x45,0x41,0x5A,0x53,0x45,0x42,
+			0x41,0x47,0x55,0x68,0x41,0x51,0x42,0x6C,0x49,0x51,0x45,0x41,0x5A,0x53,0x45,0x42,
+			0x41,0x47,0x55,0x68,0x41,0x51,0x42,0x6C,0x49,0x51,0x45,0x41,0x5A,0x53,0x45,0x42,
+			0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x5A,0x53,0x45,0x42,
+			0x41,0x47,0x55,0x68,0x41,0x51,0x42,0x6C,0x49,0x51,0x45,0x41,0x5A,0x53,0x45,0x42,
+			0x41,0x47,0x55,0x68,0x41,0x51,0x42,0x6C,0x49,0x51,0x45,0x41,0x54,0x2F,0x41,0x41,
+			0x41,0x41,0x78,0x4B,0x44,0x55,0x75,0x61,0x51,0x72,0x79,0x2F,0x51,
+			0x76,0x67,0x45,0x43,0x2F,0x72,0x6E,0x43,0x30,0x6B,0x4C,0x53,0x67,0x78,0x4C,0x6D,
+			0x78,0x6F,0x44,0x33,0x51,0x51,0x37,0x79,0x46,0x6A,0x51,0x55,0x50,0x76,0x63,0x43,
+			0x55,0x67,0x4B,0x53,0x51,0x44,0x77,0x49,0x76,0x67,0x4A,0x53,0x49,0x42,0x48,0x41,
+			0x47,0x56,0x70,0x62,0x57,0x46,0x6E,0x5A,0x51,0x42,0x6A,0x62,0x47,0x56,0x75,0x47,
+			0x66,0x58,0x73,0x59,0x32,0x39,0x6D,0x5A,0x67,0x42,0x6A,0x63,0x32,0x68,0x68,0x57,
+			0x43,0x42,0x73,0x57,0x69,0x73,0x52,0x44,0x64,0x7A,0x41,0x6F,0x70,0x48,0x77,0x30,
+			0x47,0x79,0x67,0x44,0x53,0x2B,0x77,0x36,0x55,0x78,0x6A,0x45,0x41,0x6F,0x41,0x63,
+			0x68,0x51,0x53,0x34,0x2F,0x2F,0x41,0x4E,0x64,0x43,0x2B,0x4C,0x7A,
+			0x77,0x63,0x0A,0x06,0x09,0x41,0x42,0x63,0x44,0x41,0x41,0x41,0x4E,0x41,0x41,0x46,
+			0x43,0x41,0x62,0x39,0x69,0x63,0x6D,0x4D,0x41,0x59,0x32,0x39,0x6D,0x5A,0x68,0x6B,
+			0x42,0x4B,0x66,0x38,0x33,0x65,0x67,0x3D,0x3D
+			/*
+				uint8_t test[] = {
+					0x41, 0x58, 0x55, 0x43, 0x41, 0x41, 0x46, 0x72, 0x41, 0x41, 0x46, 0x44, 0x41, 0x61,
+					0x56, 0x6B, 0x5A, 0x47, 0x46, 0x30, 0x59, 0x56, 0x6B, 0x42, 0x56, 0x44, 0x32, 0x34, 0x38, 0x35,
+					0x59, 0x41, 0x41, 0x41, 0x41, 0x41, 0x49, 0x41, 0x41, 0x41, 0x41, 0x4A, 0x6A, 0x30, 0x41, 0x41,
+					0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x51, 0x41, 0x48, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41,
+					0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x42, 0x49, 0x50, 0x6B, 0x67, 0x41, 0x51,
+					0x42, 0x56, 0x49, 0x51, 0x45, 0x41, 0x56, 0x79, 0x45, 0x42, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41,
+					0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41,
+					0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41,
+					0x41, 0x41, 0x43, 0x76, 0x4F, 0x41, 0x45, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41,
+					0x41, 0x41, 0x41, 0x44, 0x31, 0x4F, 0x41, 0x45, 0x41, 0x48, 0x7A, 0x6B, 0x42, 0x41, 0x47, 0x55,
+					0x68, 0x41, 0x51, 0x42, 0x6C, 0x49, 0x51, 0x45, 0x41, 0x5A, 0x53, 0x45, 0x42, 0x41, 0x47, 0x55,
+					0x68, 0x41, 0x51, 0x42, 0x6C, 0x49, 0x51, 0x45, 0x41, 0x5A, 0x53, 0x45, 0x42, 0x41, 0x47, 0x55,
+					0x68, 0x41, 0x51, 0x42, 0x6C, 0x49, 0x51, 0x45, 0x41, 0x5A, 0x53, 0x45, 0x42, 0x41, 0x47, 0x55,
+					0x68, 0x41, 0x51, 0x42, 0x6C, 0x49, 0x51, 0x45, 0x41, 0x5A, 0x53, 0x45, 0x42, 0x41, 0x47, 0x55,
+					0x68, 0x41, 0x51, 0x42, 0x6C, 0x49, 0x51, 0x45, 0x41, 0x5A, 0x53, 0x45, 0x42, 0x41, 0x47, 0x55,
+					0x68, 0x41, 0x51, 0x42, 0x6C, 0x49, 0x51, 0x45, 0x41, 0x5A, 0x53, 0x45, 0x42,
+					0x41, 0x47, 0x55, 0x68, 0x41, 0x51, 0x42, 0x6C, 0x49, 0x51, 0x45, 0x41, 0x5A, 0x53, 0x45, 0x42,
+					0x41, 0x47, 0x55, 0x68, 0x41, 0x51, 0x42, 0x6C, 0x49, 0x51, 0x45, 0x41, 0x5A, 0x53, 0x45, 0x42,
+					0x41, 0x47, 0x55, 0x68, 0x41, 0x51, 0x42, 0x6C, 0x49, 0x51, 0x45, 0x41, 0x5A, 0x53, 0x45, 0x42,
+					0x41, 0x47, 0x55, 0x68, 0x41, 0x51, 0x42, 0x6C, 0x49, 0x51, 0x45, 0x41, 0x5A, 0x53, 0x45, 0x42,
+					0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x5A, 0x53, 0x45, 0x42,
+					0x41, 0x47, 0x55, 0x68, 0x41, 0x51, 0x42, 0x6C, 0x49, 0x51, 0x45, 0x41, 0x5A, 0x53, 0x45, 0x42,
+					0x41, 0x47, 0x55, 0x68, 0x41, 0x51, 0x42, 0x6C, 0x49, 0x51, 0x45, 0x41, 0x54, 0x2F, 0x41, 0x41,
+					0x41, 0x41, 0x78, 0x4B, 0x44, 0x55, 0x75, 0x61, 0x51, 0x72, 0x79, 0x2F, 0x51,
+					0x76, 0x67, 0x45, 0x43, 0x2F, 0x72, 0x6E, 0x43, 0x30, 0x6B, 0x4C, 0x53, 0x67, 0x78, 0x4C, 0x6D,
+					0x78, 0x6F, 0x44, 0x33, 0x51, 0x51, 0x37, 0x79, 0x46, 0x6A, 0x51, 0x55, 0x50, 0x76, 0x63, 0x43,
+					0x55, 0x67, 0x4B, 0x53, 0x51, 0x44, 0x77, 0x49, 0x76, 0x67, 0x4A, 0x53, 0x49, 0x42, 0x48, 0x41,
+					0x50, 0x42, 0x45, 0x2B, 0x41, 0x68, 0x49, 0x41, 0x45, 0x63, 0x77, 0x41, 0x51, 0x41, 0x67, 0x6D,
+					0x44, 0x67, 0x41, 0x49, 0x47, 0x41, 0x55, 0x41, 0x67, 0x44, 0x59, 0x41, 0x41, 0x41, 0x67, 0x4D,
+					0x41, 0x45, 0x41, 0x49, 0x4A, 0x67, 0x34, 0x41, 0x43, 0x42, 0x51, 0x2F, 0x67, 0x41, 0x67, 0x4B,
+					0x53, 0x55, 0x42, 0x41, 0x46, 0x45, 0x2F, 0x41, 0x51, 0x42, 0x6C, 0x61, 0x57, 0x31, 0x68, 0x5A,
+					0x32, 0x55, 0x41, 0x59, 0x32, 0x39, 0x6D, 0x5A, 0x68, 0x6B, 0x42, 0x4B, 0x66,
+					0x2F, 0x72
+			*/
+
+			/*
+					0x41,0x58,0x55,0x43,0x41,0x41,0x46,0x72,0x41,0x41,0x46,0x44,0x41,0x61,0x4E,
+					0x6B,0x5A,0x47,0x46,0x30,0x59,0x56,0x6B,0x42,0x56,0x50,0x42,0x45,0x2B,0x41,0x68,0x49,
+					0x41,0x45,0x63,0x77,0x41,0x51,0x41,0x67,0x6D,0x44,0x67,0x41,0x49,0x47,0x41,0x55,0x41,
+					0x67,0x44,0x59,0x41,0x41,0x41,0x67,0x4D,0x41,0x45,0x41,0x49,0x4A,0x67,0x34,0x41,0x43,
+					0x42,0x51,0x2F,0x67,0x41,0x67,0x4B,0x53,0x55,0x42,0x41,0x46,0x45,0x2F,0x41,0x51,0x44,
+					0x2B,0x35,0x2F,0x37,0x6E,0x2F,0x75,0x66,0x2B,0x35,0x2F,0x37,0x6E,0x2F,0x75,0x66,0x2B,
+					0x35,0x2F,0x37,0x6E,0x2F,0x75,0x63,0x41,0x76,0x77,0x4A,0x4C,0x47,0x47,0x42,0x5A,0x59,
+					0x4A,0x68,0x67,0x63,0x45,0x63,0x41,0x76,0x39,0x67,0x41,0x41,0x43,0x41,
+					0x44,0x48,0x67,0x6E,0x62,0x44,0x45,0x71,0x51,0x61,0x46,0x4A,0x6F,0x45,0x68,0x71,0x61,
+					0x51,0x67,0x2F,0x62,0x41,0x30,0x51,0x4A,0x53,0x70,0x4E,0x67,0x63,0x45,0x63,0x48,0x53,
+					0x70,0x42,0x6F,0x41,0x30,0x51,0x53,0x61,0x4A,0x4E,0x43,0x41,0x74,0x4D,0x45,0x53,0x70,
+					0x4E,0x67,0x63,0x45,0x64,0x50,0x38,0x50,0x38,0x77,0x63,0x45,0x64,0x50,0x38,0x50,0x38,
+					0x77,0x63,0x45,0x63,0x41,0x76,0x39,0x67,0x41,0x41,0x43,0x42,0x50,0x38,0x49,0x42,0x44,
+					0x41,0x53,0x4C,0x44,0x2B,0x48,0x67,0x6C,0x63,0x45,0x63,0x43,0x53,0x78,0x68,0x6F,0x41,
+					0x50,0x41,0x42,0x41,0x48,0x42,0x48,0x41,0x4C,0x2F,0x77,0x37,0x51,0x44,0x67,
+					0x43,0x4C,0x58,0x2F,0x39,0x2F,0x58,0x2F,0x41,0x4C,0x45,0x42,0x76,0x72,0x2F,0x7A,
+					0x54,0x34,0x38,0x46,0x53,0x63,0x70,0x6F,0x41,0x76,0x54,0x67,0x59,0x67,0x52,0x4C,0x45,
+					0x30,0x50,0x4C,0x59,0x4C,0x2F,0x7A,0x54,0x34,0x38,0x41,0x76,0x2F,0x33,0x6E,0x41,0x4F,
+					0x30,0x41,0x34,0x41,0x51,0x41,0x2B,0x67,0x55,0x49,0x74,0x51,0x44,0x77,0x4B,0x66,0x68,
+					0x50,0x38,0x49,0x42,0x44,0x30,0x2F,0x67,0x59,0x4A,0x42,0x42,0x4C,0x45,0x30,0x41,0x51,
+					0x53,0x70,0x4E,0x43,0x47,0x64,0x42,0x50,0x38,0x49,0x42,0x44,0x41,0x53,0x4C,0x61,0x59,
+					0x41,0x41,0x68,0x77,0x2F,0x67,0x45,0x45,0x51,0x49,0x68,0x77,0x2F,0x67,0x59,0x46,0x5A,
+					0x70,0x67,0x54,0x2F,0x43,0x41,0x51,0x39,0x50,0x34,0x42,0x44,0x45,0x41,
+					0x4B,0x2F,0x6E,0x51,0x54,0x2F,0x43,0x41,0x51,0x39,0x50,0x34,0x47,0x43,0x51,0x44,0x53,
+					0x78,0x4E,0x41,0x41,0x30,0x71,0x54,0x51,0x76,0x44,0x52,0x43,0x4C,0x30,0x41,0x76,0x77,
+					0x4D,0x41,0x41,0x51,0x41,0x43,0x41,0x41,0x45,0x41,0x43,0x4C,0x58,0x76,0x38,0x78,0x43,
+					0x42,0x63,0x72,0x59,0x59,0x53,0x78,0x74,0x34,0x2F,0x79,0x73,0x59,0x30,0x41,0x75,0x37,
+					0x54,0x2F,0x43,0x41,0x51,0x39,0x50,0x34,0x44,0x44,0x51,0x44,0x38,0x41,0x45,0x54,0x73,
+					0x2F,0x45,0x42,0x48,0x79,0x44,0x51,0x54,0x2F,0x43,0x41,0x51,0x77,0x42,0x6C,0x61,0x57,
+					0x31,0x68,0x5A,0x32,0x55,0x41,0x59,0x32,0x39,0x6D,0x5A,0x68,0x6B,0x42,
+					0x4B,0x65,0x2B,0x36,
+			*/
+	};
+
+	/*
+	 000000: 41 58 55 43 41 41 46 72  41 41 46 44 41 61 56 6b  AXUCAAFrAAFDAaVk
+	 000010: 5a 47 46 30 59 56 6b 42  56 44 32 34 38 35 59 41  ZGF0YVkBVD2485YA
+	 000020: 41 41 41 41 49 41 41 41  41 4a 6a 30 41 41 41 41  AAAAIAAAAJj0AAAA
+	 000030: 41 41 41 41 41 51 41 48  41 41 41 41 41 41 41 41  AAAAAQAHAAAAAAAA
+	 000040: 41 41 41 41 41 41 41 42  49 50 6b 67 41 51 42 56  AAAAAAABIPkgAQBV
+	 000050: 49 51 45 41 56 79 45 42  41 41 41 41 41 41 41 41  IQEAVyEBAAAAAAAA
+	 000060: 41 41 41 41 41 41 41 41  41 41 41 41 41 41 41 41  AAAAAAAAAAAAAAAA
+	 000070: 41 41 41 41 41 41 41 41  41 41 41 41 41 41 43 76  AAAAAAAAAAAAAACv
+	 000080: 4f 41 45 41 41 41 41 41  41 41 41 41 41 41 44 31  OAEAAAAAAAAAAAD1
+	 000090: 4f 41 45 41 48 7a 6b 42  41 47 55 68 41 51 42 6c  OAEAHzkBAGUhAQBl
+	 0000a0: 49 51 45 41 5a 53 45 42  41 47 55 68 41 51 42 6c  IQEAZSEBAGUhAQBl
+	 0000b0: 49 51 45 41 5a 53 45 42  41 47 55 68 41 51 42 6c  IQEAZSEBAGUhAQBl
+	 0000c0: 49 51 45 41 5a 53 45 42  41 47 55 68 41 51 42 6c  IQEAZSEBAGUhAQBl
+	 0000d0: 49 51 45 41 5a 53 45 42  41 47 55 68 41 51 42 6c  IQEAZSEBAGUhAQBl
+	 0000e0: 49 51 45 41 5a 53 45 42  41 47 55 68 41 51 42 6c  IQEAZSEBAGUhAQBl
+	 0000f0: 49 51 45 41 5a 53 45 42  41 47 55 68 41 51 42 6c  IQEAZSEBAGUhAQBl
+	 000100: 49 51 45 41 5a 53 45 42  41 47 55 68 41 51 42 6c  IQEAZSEBAGUhAQBl
+	 000110: 49 51 45 41 5a 53 45 42  41 47 55 68 41 51 42 6c  IQEAZSEBAGUhAQBl
+	 000120: 49 51 45 41 5a 53 45 42  41 47 55 68 41 51 42 6c  IQEAZSEBAGUhAQBl
+	 000130: 49 51 45 41 5a 53 45 42  41 41 41 41 41 41 41 41  IQEAZSEBAAAAAAAA
+	 000140: 41 41 41 41 5a 53 45 42  41 47 55 68 41 51 42 6c  AAAAZSEBAGUhAQBl
+	 000150: 49 51 45 41 5a 53 45 42  41 47 55 68 41 51 42 6c  IQEAZSEBAGUhAQBl
+	 000160: 49 51 45 41 54 2f 41 41  41 41 78 4b 44 55 75 61  IQEAT/AAAAxKDUua
+	 000170: 51 72 79 2f 51 76 67 45  43 2f 72 6e 43 30 6b 4c  Qry/QvgEC/rnC0kL
+	 000180: 53 67 78 4c 6d 78 6f 44  33 51 51 37 79 46 6a 51  SgxLmxoD3QQ7yFjQ
+	 000190: 55 50 76 63 43 55 67 4b  53 51 44 77 49 76 67 4a  UPvcCUgKSQDwIvgJ
+	 0001a0: 53 49 42 48 41 50 42 45  2b 41 68 49 41 45 63 77  SIBHAPBE+AhIAEcw
+	 0001b0: 41 51 41 67 6d 44 67 41  49 47 41 55 41 67 44 59  AQAgmDgAIGAUAgDY
+	 0001c0: 41 41 41 67 4d 41 45 41  49 4a 67 34 41 43 42 51  AAAgMAEAIJg4ACBQ
+	 0001d0: 2f 67 41 67 4b 53 55 42  41 46 45 2f 41 51 42 6c  /gAgKSUBAFE/AQBl
+	 0001e0: 61 57 31 68 5a 32 55 41  59 32 39 6d 5a 68 6b 42  aW1hZ2UAY29mZhkB
+	 0001f0: 4b 66 2f 72                                       Kf/r
+	Test:
+	 000000: 01 75 02 00 01 6b 00 01  43 01 a5 64 64 61 74 61  .u...k..C..ddata
+	 000010: 59 01 54 3d b8 f3 96 00  00 00 00 20 00 00 00 98  Y.T=....... ....
+	 000020: f4 00 00 00 00 00 00 01  00 07 00 00 00 00 00 00  ................
+	 000030: 00 00 00 00 00 01 20 f9  20 01 00 55 21 01 00 57  ...... . ..U!..W
+	 000040: 21 01 00 00 00 00 00 00  00 00 00 00 00 00 00 00  !...............
+	 000050: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 af  ................
+	 000060: 38 01 00 00 00 00 00 00  00 00 00 f5 38 01 00 1f  8...........8...
+	 000070: 39 01 00 65 21 01 00 65  21 01 00 65 21 01 00 65  9..e!..e!..e!..e
+	 000080: 21 01 00 65 21 01 00 65  21 01 00 65 21 01 00 65  !..e!..e!..e!..e
+	 000090: 21 01 00 65 21 01 00 65  21 01 00 65 21 01 00 65  !..e!..e!..e!..e
+	 0000a0: 21 01 00 65 21 01 00 65  21 01 00 65 21 01 00 65  !..e!..e!..e!..e
+	 0000b0: 21 01 00 65 21 01 00 65  21 01 00 65 21 01 00 65  !..e!..e!..e!..e
+	 0000c0: 21 01 00 65 21 01 00 65  21 01 00 65 21 01 00 65  !..e!..e!..e!..e
+	 0000d0: 21 01 00 65 21 01 00 65  21 01 00 65 21 01 00 65  !..e!..e!..e!..e
+	 0000e0: 21 01 00 65 21 01 00 65  21 01 00 00 00 00 00 00  !..e!..e!.......
+	 0000f0: 00 00 00 65 21 01 00 65  21 01 00 65 21 01 00 65  ...e!..e!..e!..e
+	 000100: 21 01 00 65 21 01 00 65  21 01 00 4f f0 00 00 0c  !..e!..e!..O....
+	 000110: 4a 0d 4b 9a 42 bc bf 42  f8 04 0b fa e7 0b 49 0b  J.K.B..B......I.
+	 000120: 4a 0c 4b 9b 1a 03 dd 04  3b c8 58 d0 50 fb dc 09  J.K.....;.X.P...
+	 000130: 48 0a 49 00 f0 22 f8 09  48 80 47 00 f0 44 f8 08  H.I.."..H.G..D..
+	 000140: 48 00 47 30 01 00 20 98  38 00 20 60 14 02 00 d8  H.G0.. .8. `....
+	 000150: 00 00 20 30 01 00 20 98  38 00 20 50 fe 00 20 29  .. 0.. .8. P.. )
+	 000160: 25 01 00 51 3f 01 00 65  69 6d 61 67 65 00 63 6f  %..Q?..eimage.co
+	 000170: 66 66 19 01 29 ff eb                              ff..)..
+	nmp len=0175
+	hdr len=016b
+	 map 5
+	 text 'data'
+	 bytes[340]
+	 000000: 3d b8 f3 96 00 00 00 00  20 00 00 00 98 f4 00 00  =....... .......
+	 000010: 00 00 00 00 01 00 07 00  00 00 00 00 00 00 00 00  ................
+	 000020: 00 00 01 20 f9 20 01 00  55 21 01 00 57 21 01 00  ... . ..U!..W!..
+	 000030: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  ................
+	 000040: 00 00 00 00 00 00 00 00  00 00 00 00 af 38 01 00  .............8..
+	 000050: 00 00 00 00 00 00 00 00  f5 38 01 00 1f 39 01 00  .........8...9..
+	 000060: 65 21 01 00 65 21 01 00  65 21 01 00 65 21 01 00  e!..e!..e!..e!..
+	 000070: 65 21 01 00 65 21 01 00  65 21 01 00 65 21 01 00  e!..e!..e!..e!..
+	 000080: 65 21 01 00 65 21 01 00  65 21 01 00 65 21 01 00  e!..e!..e!..e!..
+	 000090: 65 21 01 00 65 21 01 00  65 21 01 00 65 21 01 00  e!..e!..e!..e!..
+	 0000a0: 65 21 01 00 65 21 01 00  65 21 01 00 65 21 01 00  e!..e!..e!..e!..
+	 0000b0: 65 21 01 00 65 21 01 00  65 21 01 00 65 21 01 00  e!..e!..e!..e!..
+	 0000c0: 65 21 01 00 65 21 01 00  65 21 01 00 65 21 01 00  e!..e!..e!..e!..
+	 0000d0: 65 21 01 00 65 21 01 00  00 00 00 00 00 00 00 00  e!..e!..........
+	 0000e0: 65 21 01 00 65 21 01 00  65 21 01 00 65 21 01 00  e!..e!..e!..e!..
+	 0000f0: 65 21 01 00 65 21 01 00  4f f0 00 00 0c 4a 0d 4b  e!..e!..O....J.K
+	 000100: 9a 42 bc bf 42 f8 04 0b  fa e7 0b 49 0b 4a 0c 4b  .B..B......I.J.K
+	 000110: 9b 1a 03 dd 04 3b c8 58  d0 50 fb dc 09 48 0a 49  .....;.X.P...H.I
+	 000120: 00 f0 22 f8 09 48 80 47  00 f0 44 f8 08 48 00 47  .."..H.G..D..H.G
+	 000130: 30 01 00 20 98 38 00 20  60 14 02 00 d8 00 00 20  0.. .8. `......
+	 000140: 30 01 00 20 98 38 00 20  50 fe 00 20 29 25 01 00  0.. .8. P.. )%..
+	 000150: 51 3f 01 00                                       Q?..
+	 text 'image'
+	 int 0
+	 text 'off'
+	 int 297
+	 incomplete
+	crc=ffeb
+
+
+	 000000: 41 58 55 43 41 41 46 72  41 41 46 44 41 61 4e 6b  AXUCAAFrAAFDAaNk
+	 000010: 5a 47 46 30 59 56 6b 42  56 50 42 45 2b 41 68 49  ZGF0YVkBVPBE+AhI
+	 000020: 41 45 63 77 41 51 41 67  6d 44 67 41 49 47 41 55  AEcwAQAgmDgAIGAU
+	 000030: 41 67 44 59 41 41 41 67  4d 41 45 41 49 4a 67 34  AgDYAAAgMAEAIJg4
+	 000040: 41 43 42 51 2f 67 41 67  4b 53 55 42 41 46 45 2f  ACBQ/gAgKSUBAFE/
+	 000050: 41 51 44 2b 35 2f 37 6e  2f 75 66 2b 35 2f 37 6e  AQD+5/7n/uf+5/7n
+	 000060: 2f 75 66 2b 35 2f 37 6e  2f 75 63 41 76 77 4a 4c  /uf+5/7n/ucAvwJL
+	 000070: 47 47 42 5a 59 4a 68 67  63 45 63 41 76 39 67 41  GGBZYJhgcEcAv9gA
+	 000080: 41 43 41 44 48 67 6e 62  44 45 71 51 61 46 4a 6f  ACADHgnbDEqQaFJo
+	 000090: 45 68 71 61 51 67 2f 62  41 30 51 4a 53 70 4e 67  EhqaQg/bA0QJSpNg
+	 0000a0: 63 45 63 48 53 70 42 6f  41 30 51 53 61 4a 4e 43  cEcHSpBoA0QSaJNC
+	 0000b0: 41 74 4d 45 53 70 4e 67  63 45 64 50 38 50 38 77  AtMESpNgcEdP8P8w
+	 0000c0: 63 45 64 50 38 50 38 77  63 45 63 41 76 39 67 41  cEdP8P8wcEcAv9gA
+	 0000d0: 41 43 42 50 38 49 42 44  41 53 4c 44 2b 48 67 6c  ACBP8IBDASLD+Hgl
+	 0000e0: 63 45 63 43 53 78 68 6f  41 50 41 42 41 48 42 48  cEcCSxhoAPABAHBH
+	 0000f0: 41 4c 2f 77 37 51 44 67  43 4c 58 2f 39 2f 58 2f  AL/w7QDgCLX/9/X/
+	 000100: 41 4c 45 42 76 72 2f 7a  54 34 38 46 53 63 70 6f  ALEBvr/zT48FScpo
+	 000110: 41 76 54 67 59 67 52 4c  45 30 50 4c 59 4c 2f 7a  AvTgYgRLE0PLYL/z
+	 000120: 54 34 38 41 76 2f 33 6e  41 4f 30 41 34 41 51 41  T48Av/3nAO0A4AQA
+	 000130: 2b 67 55 49 74 51 44 77  4b 66 68 50 38 49 42 44  +gUItQDwKfhP8IBD
+	 000140: 30 2f 67 59 4a 42 42 4c  45 30 41 51 53 70 4e 43  0/gYJBBLE0AQSpNC
+	 000150: 47 64 42 50 38 49 42 44  41 53 4c 61 59 41 41 68  GdBP8IBDASLaYAAh
+	 000160: 77 2f 67 45 45 51 49 68  77 2f 67 59 46 5a 70 67  w/gEEQIhw/gYFZpg
+	 000170: 54 2f 43 41 51 39 50 34  42 44 45 41 4b 2f 6e 51  T/CAQ9P4BDEAK/nQ
+	 000180: 54 2f 43 41 51 39 50 34  47 43 51 44 53 78 4e 41  T/CAQ9P4GCQDSxNA
+	 000190: 41 30 71 54 51 76 44 52  43 4c 30 41 76 77 4d 41  A0qTQvDRCL0AvwMA
+	 0001a0: 41 51 41 43 41 41 45 41  43 4c 58 76 38 78 43 42  AQACAAEACLXv8xCB
+	 0001b0: 63 72 59 59 53 78 74 34  2f 79 73 59 30 41 75 37  crYYSxt4/ysY0Au7
+	 0001c0: 54 2f 43 41 51 39 50 34  44 44 51 44 38 41 45 54  T/CAQ9P4DDQD8AET
+	 0001d0: 73 2f 45 42 48 79 44 51  54 2f 43 41 51 77 42 6c  s/EBHyDQT/CAQwBl
+	 0001e0: 61 57 31 68 5a 32 55 41  59 32 39 6d 5a 68 6b 42  aW1hZ2UAY29mZhkB
+	 0001f0: 4b 65 2b 36                                       Ke+6
+	Test:
+	 000000: 01 75 02 00 01 6b 00 01  43 01 a3 64 64 61 74 61  .u...k..C..ddata
+	 000010: 59 01 54 f0 44 f8 08 48  00 47 30 01 00 20 98 38  Y.T.D..H.G0.. .8
+	 000020: 00 20 60 14 02 00 d8 00  00 20 30 01 00 20 98 38  . `...... 0.. .8
+	 000030: 00 20 50 fe 00 20 29 25  01 00 51 3f 01 00 fe e7  . P.. )%..Q?....
+	 000040: fe e7 fe e7 fe e7 fe e7  fe e7 fe e7 fe e7 fe e7  ................
+	 000050: 00 bf 02 4b 18 60 59 60  98 60 70 47 00 bf d8 00  ...K.`Y`.`pG....
+	 000060: 00 20 03 1e 09 db 0c 4a  90 68 52 68 12 1a 9a 42  . .....J.hRh...B
+	 000070: 0f db 03 44 09 4a 93 60  70 47 07 4a 90 68 03 44  ...D.J.`pG.J.h.D
+	 000080: 12 68 93 42 02 d3 04 4a  93 60 70 47 4f f0 ff 30  .h.B...J.`pGO..0
+	 000090: 70 47 4f f0 ff 30 70 47  00 bf d8 00 00 20 4f f0  pGO..0pG..... O.
+	 0000a0: 80 43 01 22 c3 f8 78 25  70 47 02 4b 18 68 00 f0  .C."..x%pG.K.h..
+	 0000b0: 01 00 70 47 00 bf f0 ed  00 e0 08 b5 ff f7 f5 ff  ..pG............
+	 0000c0: 00 b1 01 be bf f3 4f 8f  05 49 ca 68 02 f4 e0 62  ......O..I.h...b
+	 0000d0: 04 4b 13 43 cb 60 bf f3  4f 8f 00 bf fd e7 00 ed  .K.C.`..O.......
+	 0000e0: 00 e0 04 00 fa 05 08 b5  00 f0 29 f8 4f f0 80 43  ..........).O..C
+	 0000f0: d3 f8 18 24 10 4b 13 40  10 4a 93 42 19 d0 4f f0  ...$.K.@.J.B..O.
+	 000100: 80 43 01 22 da 60 00 21  c3 f8 04 11 02 21 c3 f8  .C.".`.!.....!..
+	 000110: 18 15 9a 60 4f f0 80 43  d3 f8 04 31 00 2b f9 d0  ...`O..C...1.+..
+	 000120: 4f f0 80 43 d3 f8 18 24  03 4b 13 40 03 4a 93 42  O..C...$.K.@.J.B
+	 000130: f0 d1 08 bd 00 bf 03 00  01 00 02 00 01 00 08 b5  ................
+	 000140: ef f3 10 81 72 b6 18 4b  1b 78 ff 2b 18 d0 0b bb  ....r..K.x.+....
+	 000150: 4f f0 80 43 d3 f8 0c 34  03 f0 01 13 b3 f1 01 1f  O..C...4........
+	 000160: 20 d0 4f f0 80 43 00 65  69 6d 61 67 65 00 63 6f   .O..C.eimage.co
+	 000170: 66 66 19 01 29 ef ba                              ff..)..
+	nmp len=0175
+	hdr len=016b
+	 map 3
+	 text 'data'
+	 bytes[340]
+	 000000: f0 44 f8 08 48 00 47 30  01 00 20 98 38 00 20 60  .D..H.G0.. .8. `
+	 000010: 14 02 00 d8 00 00 20 30  01 00 20 98 38 00 20 50  ...... 0.. .8. P
+	 000020: fe 00 20 29 25 01 00 51  3f 01 00 fe e7 fe e7 fe  .. )%..Q?.......
+	 000030: e7 fe e7 fe e7 fe e7 fe  e7 fe e7 fe e7 00 bf 02  ................
+	 000040: 4b 18 60 59 60 98 60 70  47 00 bf d8 00 00 20 03  K.`Y`.`pG..... .
+	 000050: 1e 09 db 0c 4a 90 68 52  68 12 1a 9a 42 0f db 03  ....J.hRh...B...
+	 000060: 44 09 4a 93 60 70 47 07  4a 90 68 03 44 12 68 93  D.J.`pG.J.h.D.h.
+	 000070: 42 02 d3 04 4a 93 60 70  47 4f f0 ff 30 70 47 4f  B...J.`pGO..0pGO
+	 000080: f0 ff 30 70 47 00 bf d8  00 00 20 4f f0 80 43 01  ..0pG..... O..C.
+	 000090: 22 c3 f8 78 25 70 47 02  4b 18 68 00 f0 01 00 70  "..x%pG.K.h....p
+	 0000a0: 47 00 bf f0 ed 00 e0 08  b5 ff f7 f5 ff 00 b1 01  G...............
+	 0000b0: be bf f3 4f 8f 05 49 ca  68 02 f4 e0 62 04 4b 13  ...O..I.h...b.K.
+	 0000c0: 43 cb 60 bf f3 4f 8f 00  bf fd e7 00 ed 00 e0 04  C.`..O..........
+	 0000d0: 00 fa 05 08 b5 00 f0 29  f8 4f f0 80 43 d3 f8 18  .......).O..C...
+	 0000e0: 24 10 4b 13 40 10 4a 93  42 19 d0 4f f0 80 43 01  $.K.@.J.B..O..C.
+	 0000f0: 22 da 60 00 21 c3 f8 04  11 02 21 c3 f8 18 15 9a  ".`.!.....!.....
+	 000100: 60 4f f0 80 43 d3 f8 04  31 00 2b f9 d0 4f f0 80  `O..C...1.+..O..
+	 000110: 43 d3 f8 18 24 03 4b 13  40 03 4a 93 42 f0 d1 08  C...$.K.@.J.B...
+	 000120: bd 00 bf 03 00 01 00 02  00 01 00 08 b5 ef f3 10  ................
+	 000130: 81 72 b6 18 4b 1b 78 ff  2b 18 d0 0b bb 4f f0 80  .r..K.x.+....O..
+	 000140: 43 d3 f8 0c 34 03 f0 01  13 b3 f1 01 1f 20 d0 4f  C...4........ .O
+	 000150: f0 80 43 00                                       ..C.
+	 text 'image'
+	 int 0
+	 text 'off'
+	 int 297
+	 incomplete
+	crc=efba
+	*/
+	int n = sizeof(test);
+	memcpy(buf, test, n);
+	MEM_Trace(buf, n, 0L);
+	printf("Test:\n");
+	int m;
+	m = base64_decode_len((const char*)&buf[0]);
+	m = base64_decode((char*)&buf[0], dec_buf);
+	MEM_Trace(dec_buf, m, 0L);
+	int len = (dec_buf[0] << 8) + dec_buf[1];
+	TRACE("nmp len=%04x\n", len);
+	struct nmp_packet* pkt = (struct nmp_packet*)&dec_buf[2];
+	nmp_hdr_t* hdr = &pkt->hdr;
+	len = swapbytes(hdr->Len);
+	TRACE("hdr len=%04x\n", len);
+	TraceNmpHdr(hdr);
+	cbor_parse(pkt->data, len);
+	TRACE("crc=%02x%02x\n", dec_buf[m - 2], dec_buf[m - 1]);
+}
 #endif

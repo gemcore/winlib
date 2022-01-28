@@ -144,7 +144,9 @@
   <ItemGroup>
     <ClInclude Include="src\active.h" />
     <ClInclude Include="src\ASCII.H" />
+    <ClInclude Include="src\base64\base64.h" />
     <ClInclude Include="src\BASEFILE.HPP" />
+    <ClInclude Include="src\cbor\cbor.h" />
     <ClInclude Include="src\CIRCBUF.HPP" />
     <ClInclude Include="src\comport.h" />
     <ClInclude Include="src\dhara\bytes.h" />
@@ -169,8 +171,13 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="crc.c" />
+    <ClCompile Include="ecc.c" />
+    <ClCompile Include="Source.cpp" />
     <ClCompile Include="src\active.cpp" />
+    <ClCompile Include="src\base64\base64.c" />
     <ClCompile Include="src\BASEFILE.CPP" />
+    <ClCompile Include="src\cbor\cbor.c" />
     <ClCompile Include="src\CIRCBUF.CPP" />
     <ClCompile Include="src\comport.cpp" />
     <ClCompile Include="src\dhara\error.c" />

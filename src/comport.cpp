@@ -38,8 +38,8 @@ ComPort::ComPort(int num,DWORD baud,BYTE parity,BYTE stop) :
    fXonXoff(FALSE),
    fDisplayErrors(FALSE),
    bByteSize(8),
-   ctxbuf(512),
-   crxbuf(512)
+   ctxbuf(1024),
+   crxbuf(1024)
 {
    sprintf( szPort, "COM%d", bPort );
    
