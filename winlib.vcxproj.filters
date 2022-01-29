@@ -170,9 +170,6 @@
     <ClCompile Include="src\cbor\cbor.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Source.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="ecc.c">
       <Filter>Source Files</Filter>
     </ClCompile>

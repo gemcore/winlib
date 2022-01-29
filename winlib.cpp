@@ -38,6 +38,7 @@ int dflag = true;
 //#define TMR_TESTING
 //#define MDM_TESTING
 //#define FTL_TESTING
+#define SEND_IMAGE
 
 /* xScript Rx initial timeout maximum value. */
 #define TMR_TIMEOUT_MAX	32000
@@ -1889,140 +1890,6 @@ int main(int argc, char *argv[])
 }
 #endif
 
-#ifdef CBOR_TESTING
-#include <stdio.h>
-#include "src/cbor/cbor.h"
-
-char qflag = 0;  						// quiet mode off (output to window)
-
-int main(int argc, char** argv)
-{
-	unsigned char buffer[512];
-	unsigned int size = 512;
-	unsigned char* data = buffer;
-
-	// Open log file to capture output from putchar, puts and printf macros.
-	LOG_Init(NULL);
-
-	unsigned char* p;
-	int i;
-
-	printf("map(%d):\n", 1);
-	p = cbor_write_map(data, size, 1);
-	i = p-data;
-	MEM_Trace(data, i, 0L);
-	data = p;
-
-	printf("text(%s):\n", "foo");
-	p = cbor_write_text(data, size, "foo");
-	i = p - data;
-	MEM_Trace(data, i, 0L);
-	data = p;
-
-	printf("int(%d):\n", 1234);
-	p = cbor_write_int(data, size, 1234);
-	i = p - data;
-	MEM_Trace(data, i, 0L);
-	data = p;
-
-	p = cbor_write_array(data, size, 5);
-	i = p - data;
-	MEM_Trace(data, i, 0L);
-	data = p;
-
-	printf("int(%d):\n", 123);
-	p = cbor_write_int(data, size, 123);
-	i = p - data;
-	MEM_Trace(data, i, 0L);
-	data = p;
-
-	printf("text(%s):\n", "hello");
-	p = cbor_write_text(data, size, "hello");
-	i = p - data;
-	MEM_Trace(data, i, 0L);
-	data = p;
-
-	printf("text(%s):\n", "world");
-	p = cbor_write_text(data, size, "world");
-	i = p - data;
-	MEM_Trace(data, i, 0L);
-	data = p;
-
-	printf("long(%d):\n", 12312312311ULL);
-	p = cbor_write_long(data, size, 12312312311ULL);
-	i = p - data;
-	MEM_Trace(data, i, 0L);
-	data = p;
-
-	printf("text(%s):\n", "f:D");
-	p = cbor_write_text(data, size, ":D");
-	i = p - data;
-	MEM_Trace(data, i, 0L);
-	data = p;
-
-	unsigned int offset = 0;
-	struct cbor_token token;
-	while (1) {
-		offset = cbor_read_token(buffer, data - buffer, offset, &token);
-
-		if (token.type == CBOR_TOKEN_TYPE_INCOMPLETE) {
-			printf("INCOMPLETE\n");
-			break;
-		}
-
-		if (token.type == CBOR_TOKEN_TYPE_ERROR) {
-			printf("ERROR: %s\n", token.error_value);
-			break;
-		}
-
-		if (token.type == CBOR_TOKEN_TYPE_INT) {
-			printf("int %s%u\n", token.sign < 0 ? "-" : "", token.int_value);
-			continue;
-		}
-
-		if (token.type == CBOR_TOKEN_TYPE_LONG) {
-			printf("long %s%llu\n", token.sign < 0 ? "-" : "", token.long_value);
-			continue;
-		}
-
-		if (token.type == CBOR_TOKEN_TYPE_ARRAY) {
-			printf("array %u\n", token.int_value);
-			continue;
-		}
-
-		if (token.type == CBOR_TOKEN_TYPE_MAP) {
-			printf("map %u\n", token.int_value);
-			continue;
-		}
-
-		if (token.type == CBOR_TOKEN_TYPE_TAG) {
-			printf("tag %u\n", token.int_value);
-			continue;
-		}
-
-		if (token.type == CBOR_TOKEN_TYPE_SPECIAL) {
-			printf("special %u\n", token.int_value);
-			continue;
-		}
-
-		if (token.type == CBOR_TOKEN_TYPE_STRING) {
-			printf("text '%.*s'\n", token.int_value, token.text_value);
-			continue;
-		}
-
-		if (token.type == CBOR_TOKEN_TYPE_BYTES) {
-			printf("bytes with size %u\n", token.int_value);
-			continue;
-		}
-	}
-
-	// Close capture log file.
-	LOG_Term();
-
-	return 0;
-}
-#endif
-
 #ifdef TMR_TESTING
 char qflag = 0;  						// quiet mode off (output to window)
 
@@ -2086,6 +1953,310 @@ int main(int argc, char* argv[])
 
 	// Close capture log file.
 	LOG_Term();
+	return 0;
+}
+#endif
+
+#include "src/cbor/cbor.h"
+
+int token_cnt = 0;
+cbor_token_t tokens[16];
+
+cbor_token_t* cbor_get_key(char* s)
+{
+	bool key = false;
+	for (int i = 0; i < token_cnt; i++)
+	{
+		if (!key && tokens[i].type == CBOR_TOKEN_TYPE_TEXT)
+		{
+			if (!strncmp(s, tokens[i].text_value, tokens[i].int_value))
+			{
+				key = true;
+			}
+		}
+		else
+		{
+			if (key)
+			{
+				return &tokens[i];
+			}
+		}
+	}
+	return NULL;
+}
+
+unsigned int cbor_parse(unsigned char* data, int size)
+{
+	unsigned int offset = 0;
+	token_cnt = 0;
+	long j = 0;
+	while (1)
+	{
+		// Build up a list of tokens that are contained in a global array.
+		cbor_token_t* token = &tokens[token_cnt++];
+
+		offset = cbor_read_token(data, size, offset, token);
+
+		if (token->type == CBOR_TOKEN_TYPE_INCOMPLETE) {
+			TRACE(" incomplete\n");
+			break;
+		}
+		if (token->type == CBOR_TOKEN_TYPE_ERROR) {
+			TRACE(" error: %s\n", token->error_value);
+			break;
+		}
+		if (token->type == CBOR_TOKEN_TYPE_BREAK) {
+			TRACE(" break\n");
+			MEM_Trace(&data[j], offset - j, j);
+			j = offset;
+			continue;
+		}
+		if (token->type == CBOR_TOKEN_TYPE_INT) {
+			TRACE(" int(%s%u)\n", token->sign < 0 ? "-" : "", token->int_value);
+			MEM_Trace(&data[j], offset - j, j);
+			j = offset;
+			continue;
+		}
+		if (token->type == CBOR_TOKEN_TYPE_LONG) {
+			TRACE(" long(%s%llu)\n", token->sign < 0 ? "-" : "", token->long_value);
+			MEM_Trace(&data[j], offset - j, j);
+			j = offset;
+			continue;
+		}
+		if (token->type == CBOR_TOKEN_TYPE_ARRAY) {
+			if (token->int_value == 31)
+				TRACE(" array(*)\n");
+			else
+				TRACE(" array(%u)\n", token->int_value);
+			MEM_Trace(&data[j], offset - j, j);
+			j = offset;
+			continue;
+		}
+		if (token->type == CBOR_TOKEN_TYPE_MAP) {
+			if (token->int_value == 31)
+				TRACE(" map(*)\n");
+			else
+				TRACE(" map(%u)\n", token->int_value);
+			MEM_Trace(&data[j], offset - j, j);
+			j = offset;
+			continue;
+		}
+		if (token->type == CBOR_TOKEN_TYPE_TAG) {
+			TRACE(" tag(%u)\n", token->int_value);
+			MEM_Trace(&data[j], offset - j, j);
+			j = offset;
+			continue;
+		}
+		if (token->type == CBOR_TOKEN_TYPE_SPECIAL) {
+			TRACE(" special(%u)\n", token->int_value);
+			MEM_Trace(&data[j], offset - j, j);
+			j = offset;
+			continue;
+		}
+		if (token->type == CBOR_TOKEN_TYPE_TEXT) {
+			TRACE(" text('%.*s')\n", token->int_value, token->text_value);
+			MEM_Trace(&data[j], offset - j, j);
+			j = offset;
+			continue;
+		}
+		if (token->type == CBOR_TOKEN_TYPE_BYTES) {
+			TRACE(" bytes([%u]:", token->int_value);
+			for (int i=0; i < token->int_value; i++)
+			{
+				TRACE("%02x ", token->bytes_value[i]);
+			}
+			TRACE(")\n");
+			MEM_Trace(&data[j], offset - j, j);
+			j = offset;
+			continue;
+		}
+	}
+
+	return offset;
+}
+
+class CBOR
+{
+public:
+	unsigned char* bfr;
+	unsigned char* p;
+	unsigned char* q;
+	long base;
+	int size;
+
+	CBOR(unsigned char* buf, int n)
+	{
+		bfr = buf;
+		base = 0L;
+		size = n;
+		q = bfr;
+		//TRACE("bfr @%xH size=%d\n", bfr, size);
+	}
+
+	void put_map(int m)
+	{
+		TRACE(" map(%d)\n", m);
+		p = cbor_write_map(q, size - base, m);
+		MEM_Trace(q, p - q, base);
+		base += p - q;
+		q = p;
+	}
+
+	void put_text(char* s)
+	{
+		TRACE(" text('%s')\n", s);
+		p = cbor_write_text(q, size - base, s);
+		MEM_Trace(q, p - q, base);
+		base += p - q;
+		q = p;
+	}
+
+
+	void put_array(int m)
+	{
+		TRACE(" array(%d)", m);
+		p = cbor_write_array(q, size - base, m);
+		MEM_Trace(q, p - q, base);
+		base += p - q;
+		q = p;
+	}
+
+	void put_bytes(unsigned char* bytes, int m)
+	{
+		TRACE(" bytes([%d]:", m);
+		for (int i = 0; i < m; i++)
+		{
+			TRACE("%02x ", bytes[i]);
+		}
+		TRACE("\n");
+		p = cbor_write_bytes(q, size - base, bytes, m);
+		MEM_Trace(q, p - q, base);
+		base += p - q;
+		q = p;
+	}
+
+	void put_int(int n)
+	{
+		TRACE(" int(%d)\n", n);
+		p = cbor_write_int(q, size - base, n);
+		MEM_Trace(q, p - q, base);
+		base += p - q;
+		q = p;
+	}
+
+	void put_long(long long n)
+	{
+		TRACE(" long(%ld)\n", n);
+		p = cbor_write_long(q, size - base, n);
+		MEM_Trace(q, p - q, base);
+		base += p - q;
+		q = p;
+	}
+
+	~CBOR()
+	{
+		//TRACE("bfr len=%d:\n", base);
+	}
+};
+
+#ifdef CBOR_TESTING
+#include <stdio.h>
+
+char qflag = 0;  						// quiet mode off (output to window)
+
+char* cbor_typetostr(int type)
+{
+	switch (type)
+	{
+	case CBOR_TOKEN_TYPE_ERROR:
+		return "ERROR";
+	case CBOR_TOKEN_TYPE_INCOMPLETE:
+		return "INCOMPLETE";
+	case CBOR_TOKEN_TYPE_INT:
+		return "INT";
+	case CBOR_TOKEN_TYPE_LONG:
+		return "LONG";
+	case CBOR_TOKEN_TYPE_MAP:
+		return "MAP";
+	case CBOR_TOKEN_TYPE_ARRAY:
+		return "ARRAY";
+	case CBOR_TOKEN_TYPE_TEXT:
+		return "TEXT";
+	case CBOR_TOKEN_TYPE_BYTES:
+		return "BYTES";
+	case CBOR_TOKEN_TYPE_TAG:
+		return "TAG";
+	case CBOR_TOKEN_TYPE_SPECIAL:
+		return "SPECIAL";
+	case CBOR_TOKEN_TYPE_BREAK:
+		return "BREAK";
+	default:
+		return "UNKNOWN";
+	}
+}
+
+void cbor_list_all(void)
+{
+	printf("%d tokens found:\n", token_cnt);
+	cbor_token_t* token = tokens;
+	for (int i = 0; i < token_cnt; i++, token++)
+	{
+		printf("%2d:\t%d=CBOR_TOKEN_TYPE_%s\n", i, token->type, cbor_typetostr(token->type));
+	}
+}
+
+int main(int argc, char** argv)
+{
+	static unsigned char buffer[512];
+	unsigned int size = sizeof(buffer);
+	unsigned char* data = buffer;
+
+	// Open log file to capture output from putchar, puts and printf macros.
+	LOG_Init(NULL);
+
+	printf("\ncbor put:\n");
+	CBOR cbor(data, size);
+	cbor.put_map(2);
+	cbor.put_text("data");
+	unsigned char bytes[] = { 0x01,0x02,0x03,0x04,0x05,0x07 };
+	cbor.put_bytes(bytes, sizeof(bytes)); // size of data (in bytes);
+	cbor.put_text("foo");
+	cbor.put_int(1234);
+	cbor.put_array(5);
+	cbor.put_int(123);
+	cbor.put_text("hello");
+	cbor.put_text("world");
+	cbor.put_int(1231231231);
+	cbor.put_long(12312312311ULL);
+	cbor.put_text("f:D");
+	int base = cbor.base;
+
+	printf("\ncbor data:\n");
+	MEM_Dump(data, base, 0L);
+
+	printf("\ncbor parse:\n");
+	unsigned int offset = cbor_parse(data, base);
+	printf("offset=%d\n", offset);
+
+	printf("\ncbor list all:\n");
+	cbor_list_all();
+
+	// Do key lookups based on a 'text' token paired with the token following it.
+	// Find key "data":bytes[].
+	printf("\ncbor get key:\n");
+	cbor_token_t* token;
+	token = cbor_get_key("data");
+	unsigned int n = token->int_value;	// total number of bytes of data[] received
+	printf("data[%d]:", n);
+	MEM_Dump(token->bytes_value, n, 0L);
+
+	// Find key "foo":int.
+	token = cbor_get_key("foo");
+	printf("foo:%d\n", token->int_value);
+
+	// Close capture log file.
+	LOG_Term();
+
 	return 0;
 }
 #endif
@@ -2183,135 +2354,6 @@ void send_buf(unsigned char *buf, int n)
  */
 #define MGMT_NLIP_MAX_FRAME     127
 
-class CBOR
-{
-public:
-	unsigned char *bfr;
-	unsigned char* p;
-	unsigned char* q;
-	long base;
-	int size;
-
-	CBOR(unsigned char* buf, int n)
-	{
-		bfr = buf;
-		base = 0L;
-		size = n;
-		q = bfr;
-		//TRACE("bfr @%xH size=%d\n", bfr, size);
-	}
-
-	void put_map(int n)
-	{
-		TRACE(" map %d\n", n);
-		p = cbor_write_map(q, size - base, n);
-		MEM_Trace(q, p - q, base);
-		base += p - q;
-		q = p;
-	}
-
-	void put_text(char* s)
-	{
-		TRACE(" text '%s'\n", s);
-		p = cbor_write_text(q, size - base, s);
-		MEM_Trace(q, p - q, base);
-		base += p - q;
-		q = p;
-	}
-
-	void put_bytes(unsigned char* bytes, int m)
-	{
-		TRACE(" bytes[%d]\n", m);
-		p = cbor_write_bytes(q, size - base, bytes, m);
-		MEM_Trace(q, p - q, base);
-		base += p - q;
-		q = p;
-	}
-
-	void put_int(int n)
-	{
-		TRACE(" int %d\n", n);
-		p = cbor_write_int(q, size - base, n);
-		MEM_Trace(q, p - q, base);
-		base += p - q;
-		q = p;
-	}
-
-	~CBOR()
-	{
-		//TRACE("bfr len=%d:\n", base);
-	}
-};
-
-int token_cnt = 0;
-cbor_token_t tokens[16];
-
-unsigned int cbor_parse(unsigned char* data, int size)
-{
-	unsigned int offset = 0;
-	token_cnt = 0;
-	while (1)
-	{
-		cbor_token_t *token = &tokens[token_cnt++];
-
-		offset = cbor_read_token(data, size, offset, token);
-
-		if (token->type == CBOR_TOKEN_TYPE_INCOMPLETE) {
-			TRACE(" incomplete\n");
-			break;
-		}
-		if (token->type == CBOR_TOKEN_TYPE_ERROR) {
-			TRACE(" error: %s\n", token->error_value);
-			break;
-		}
-		if (token->type == CBOR_TOKEN_TYPE_BREAK) {
-			TRACE(" break\n");
-			continue;
-		}
-		if (token->type == CBOR_TOKEN_TYPE_INT) {
-			TRACE(" int %s%u\n", token->sign < 0 ? "-" : "", token->int_value);
-			continue;
-		}
-		if (token->type == CBOR_TOKEN_TYPE_LONG) {
-			TRACE(" long %s%llu\n", token->sign < 0 ? "-" : "", token->long_value);
-			continue;
-		}
-		if (token->type == CBOR_TOKEN_TYPE_ARRAY) {
-			if (token->int_value == 31)
-				TRACE(" array *\n");
-			else
-				TRACE(" array %u\n", token->int_value);
-			continue;
-		}
-		if (token->type == CBOR_TOKEN_TYPE_MAP) {
-			if (token->int_value == 31)
-				TRACE(" map *\n");
-			else
-				TRACE(" map %u\n", token->int_value);
-			continue;
-		}
-		if (token->type == CBOR_TOKEN_TYPE_TAG) {
-			TRACE(" tag %u\n", token->int_value);
-			continue;
-		}
-		if (token->type == CBOR_TOKEN_TYPE_SPECIAL) {
-			TRACE(" special %u\n", token->int_value);
-			continue;
-		}
-		if (token->type == CBOR_TOKEN_TYPE_TEXT) {
-			TRACE(" text '%.*s'\n", token->int_value, token->text_value);
-			continue;
-		}
-		if (token->type == CBOR_TOKEN_TYPE_BYTES) {
-			TRACE(" bytes[%u]\n", token->int_value);
-			MEM_Trace(token->bytes_value, token->int_value, 0);
-			continue;
-		}
-	}
-
-	return offset;
-}
-
 typedef struct nmp_hdr
 {
 	unsigned char Op;
@@ -2356,7 +2398,7 @@ void recv_nmp_resp(void)
 	enc_str[len] = '\0';
 	TRACE("rx: '%s'\n", enc_str);
 	int m;
-	m = base64_decode_len(enc_str);
+	//m = base64_decode_len(enc_str);
 	m = base64_decode(enc_str, dec_buf);
 	MEM_Trace(dec_buf, m, 0L);
 	// NMP header (8-bytes):
@@ -2415,8 +2457,7 @@ void recv_packets(unsigned char *data, int size)
 {
 	long count = 0;		// NMP packet counter
 	long j = 0;			// file data[] offset
-	long k = 0;			// accumulated decoded base64 data offset in buf[]
-	unsigned int len;
+	unsigned int len = 0;
 	BASEFILE bf;
 
 	TRACE("recv_packets()\n");
@@ -2424,13 +2465,21 @@ void recv_packets(unsigned char *data, int size)
 
 	while (j <= size)
 	{
-		MEM_Trace(&data[j], 515, 0L);
+		if ((j + 515) < size)
+		{
+			MEM_Trace(&data[j], 515, 0L);
+		}
+		else
+		{
+			MEM_Trace(&data[j], size - j, 0L);
+		}
 		count++;	// increment count of packets
 		TRACE("rx packet #%d\n", count);
+		int k = 0;		// accumulated decoded base64 data offset in buf[]
 		do
 		{
 			bool flag;
-			nlip_hdr_t* nlip_hdr = (nlip_hdr_t*)&data[j];
+			nlip_hdr_t *nlip_hdr = (nlip_hdr_t*)&data[j];
 			TRACE("rx: %02x %02x\n", nlip_hdr->type[0], nlip_hdr->type[1]);
 			if (nlip_hdr->type[0] == 0x06 && nlip_hdr->type[1] == 0x09)
 			{
@@ -2447,50 +2496,63 @@ void recv_packets(unsigned char *data, int size)
 				printf("Bad NLIP header type bytes!\n");
 			}
 			j += sizeof(nlip_hdr_t);
-			// Begin base64 encoding
-			unsigned char *ptr = &data[j];
 			int i = 0;
-			while (data[j+i] != 0x0a)
+			while (data[j] != 0x0a)
 			{
-				i++;
+				enc_str[i++] = data[j++];
 			}
-			strncpy(enc_str, (char*)&data[j], i);
 			enc_str[i] = '\0';
-			j += i;
-			// End base64 encoding
 			TRACE("rx: '%s'\n", enc_str);
 			j += 1;
 			TRACE("rx: <LF>\n");
 			int m;
-			m = base64_decode_len(enc_str);
-			m = base64_decode(enc_str, dec_buf);
-			MEM_Trace(dec_buf, m, 0L);
-			// Accumulate the decoded base64 data in buf[].
-			memcpy(&buf[k], dec_buf, m);
-			k += m;
-			if (flag == true)
+			//m = base64_decode_len(enc_str);
+			m = base64_decode(enc_str, &dec_buf[k]);
+			MEM_Trace(&dec_buf[k], m, 0L);
+			if (flag)
 			{
 				// NMP total length of decoded packet data (in CBOR format) (2-bytes)
-				len = swapbytes(*(uint16_t*)&dec_buf[0]);
+				len = swapbytes(*(uint16_t*)&dec_buf[k+0]);
 				TRACE("nmp len=%04x\n", len);
 				// NMP header (8-bytes)
-				nmp_hdr_t* hdr = (nmp_hdr_t*)&dec_buf[2];
+				nmp_hdr_t *hdr = (nmp_hdr_t *)&dec_buf[k+2];
 				TRACE("hdr len=%04x\n", swapbytes(hdr->Len));
 				TraceNmpHdr(hdr);
 			}
+			// Accumulate the decoded base64 data in dec_buf[].
+			k += m;
 		}
 		while (k < len);
 
 		// Parse NMP packet payload as CBOR data map.
-		MEM_Trace(buf, len, 0L);
-		unsigned int offset = cbor_parse(&buf[10], len-2-8);
-		unsigned int remaining = len - 8 - offset;
+		MEM_Trace(dec_buf, len, 0L);
+		unsigned int offset = cbor_parse(&dec_buf[10], len-10);
+		unsigned int remaining = len-8-offset;
 		TRACE("remaining=%x ", remaining);
-		uint16_t crc = swapbytes(*(uint16_t*)&buf[len - 2]);
-		TRACE("offset=%x\n", offset);
-		TRACE("crc=%04x\n", crc);
+		uint16_t crc = swapbytes(*(uint16_t*)&dec_buf[len]);
+		TRACE("offset=%x crc=%04x\n", offset, crc);
 
-		bf.WritetoFile((DWORD)len, (BYTE*)buf);
+		// Determine if this is the last packet based on cbor map key pairs.
+		cbor_token_t* token = cbor_get_key("data");
+		unsigned int n = token->int_value;	// total number of bytes of data[] received
+		TRACE("data[%d]", n);
+		MEM_Trace(token->bytes_value, n, 0L);
+		bf.WritetoFile((DWORD)n, (BYTE*)token->bytes_value);
+		if (count == 1)
+		{
+			// First packet has the expected total number of bytes in the image.
+			token = cbor_get_key("len");
+			total_len = token->int_value;
+			TRACE("total_len=%d\n", total_len);
+		}
+		token = cbor_get_key("off");
+		unsigned int off = token->int_value;
+		TRACE("off=%d\n", off);
+		if ((off + n) == total_len)
+		{
+			printf("Last packet\n");
+			break;
+		}
 	}
 
 	bf.CloseFile();
@@ -2602,6 +2664,7 @@ unsigned char *read_image(char* filename)
 		if (size > BUFSIZE)
 		{
 			bf.ReadfromFile(BUFSIZE, buf);
+			MEM_Dump(buf, BUFSIZE, j);
 			memcpy(&data[j], buf, BUFSIZE);
 			size -= BUFSIZE;
 			j += BUFSIZE;
@@ -2609,11 +2672,14 @@ unsigned char *read_image(char* filename)
 		else
 		{
 			bf.ReadfromFile(size, buf);
+			MEM_Dump(buf, size, j);
 			memcpy(&data[j], buf, size);
+			j += size;
 			size = 0;
 		}
+		//printf(" %05d\b\b\b\b\b\b", j);
 	}
-	TRACE("read_image done\n");
+	TRACE("\nread_image done\n");
 	return data;
 }
 
@@ -2745,24 +2811,21 @@ int check_file(char* filename)
 int main(int argc, char* argv[])
 {
 	// Open log file to capture output from putchar, puts and printf macros.
-	LOG_Init(NULL);
+	LOG_Init("winlib.log");
 
 	TMR_Init(100);	// 100ms timebase
 	COM_Init(26, 115200);
 	TMR_Delay(5);
 
-	//nmp_test();
-	//exit(0);
+#if 0
+	nmp_test();
+	exit(0);
+#endif
 
 #ifdef SEND_IMAGE
 	if (com->IsConnected())
-#else
-	if (0)
-#endif
 	{
 		printf("Comport is connected!\n");
-		//printf("Delay for 1 sec\n");
-		//TMR_Delay(10); 
 
 		unsigned char HCI_SetUpload[] = {
 			0x01,0x04,0xfc,0x01,0x01 };
@@ -2793,8 +2856,9 @@ int main(int argc, char* argv[])
 			TMR_Delay(1);
 		}
 	}
+#endif
 
-	/* Dumb resource intensive way is to read the whole file into a buffer! */
+	/* Dumb resource intensive way is to read the whole file into a large data buffer! */
 	unsigned char *data = read_image("blehci.img");
 	if (data == NULL)
 	{
@@ -2809,50 +2873,59 @@ int main(int argc, char* argv[])
 	** are longer and the final packet is variable based on the exact remainder needed for 
 	** the last fragment of the image.
 	*/
+	// Capture all serial output to a file to be useverify correct operation.
 	BASEFILE bf;
 	bf.InitWriteFile("send.bin");
 
 	unsigned int offset = 0;
-	int size = 0x0129;
+	int size;
 	int i;
 	long count = 0;
-	count++;	// increment count of packets
-	TRACE("tx packet #%d\n", count);
-	i = send_nmp_packet(offset, size, data);
-	recv_nmp_resp();
-	bf.WritetoFile((DWORD)i, (BYTE*)buf);
 
-	offset += size;
-	size = 0x0154;
-	do
+	size = 0x0129;
+	if ((offset + size) <= total_len)
 	{
 		count++;	// increment count of packets
 		TRACE("tx packet #%d\n", count);
 		i = send_nmp_packet(offset, size, data);
-		recv_nmp_resp();
 		bf.WritetoFile((DWORD)i, (BYTE*)buf);
-
-		if ((offset + size) >= total_len)
-		{
-			size = total_len - offset;
-		}
+		recv_nmp_resp();
 		offset += size;
-	} 
-	while (size > 0);
+
+		// Change to larger size packet.
+		size = 0x0154;
+		while ((offset + size) <= total_len)
+		{
+			count++;	// increment count of packets
+			TRACE("tx packet #%d\n", count);
+			i = send_nmp_packet(offset, size, data);
+			bf.WritetoFile((DWORD)i, (BYTE*)buf);
+			recv_nmp_resp();
+			offset += size;
+		}
+	}
+	if ((offset + size) > total_len)
+	{
+		size = total_len - offset;
+		count++;	// increment count of packets
+		TRACE("tx packet #%d\n", count);
+		i = send_nmp_packet(offset, size, data);
+		bf.WritetoFile((DWORD)i, (BYTE*)buf);
+		recv_nmp_resp();
+		offset += size;
+	}
 
 	bf.CloseFile();
 	delete data;
 
 	check_file("send.bin");
 
+#ifdef SEND_IMAGEG
 	nmp_imagelist();
 	TMR_Delay(10);
 	nmp_reset();
-
-#ifdef TESTING
-	send_buf(buf, n);
-	recv_buf(20, -1);
 #endif
+
 	COM_Term();
 	TMR_Term();
 
@@ -2862,6 +2935,7 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
+#if 0
 void nmp_test(void)
 {
 	uint8_t test[] = {
@@ -3174,4 +3248,5 @@ void nmp_test(void)
 	cbor_parse(pkt->data, len);
 	TRACE("crc=%02x%02x\n", dec_buf[m - 2], dec_buf[m - 1]);
 }
+#endif
 #endif

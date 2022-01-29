@@ -12,8 +12,8 @@
 #define CBOR_TOKEN_TYPE_SPECIAL 8
 #define CBOR_TOKEN_TYPE_BREAK 9
 
-#define CBOR_TOKEN_TYPE_INCOMPLETE 1000
-#define CBOR_TOKEN_TYPE_ERROR 2000
+#define CBOR_TOKEN_TYPE_INCOMPLETE  -1
+#define CBOR_TOKEN_TYPE_ERROR       -2
 
 
 typedef struct cbor_token {
