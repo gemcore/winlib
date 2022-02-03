@@ -2143,7 +2143,7 @@ public:
 		//TRACE("bfr @%xH size=%d\n", bfr, size);
 	}
 
-	void put_map(int m)
+	void def_map(int m)
 	{
 		TRACE(" map(%d)\n", m);
 		p = cbor_write_map(q, size - base, m);
@@ -2152,7 +2152,7 @@ public:
 		q = p;
 	}
 
-	void put_array(int m)
+	void def_array(int m)
 	{
 		TRACE(" array(%d)", m);
 		p = cbor_write_array(q, size - base, m);
@@ -2161,7 +2161,7 @@ public:
 		q = p;
 	}
 
-	void put_int(int n)
+	void put(int n)
 	{
 		TRACE(" int(%d)\n", n);
 		p = cbor_write_int(q, size - base, n);
@@ -2170,7 +2170,7 @@ public:
 		q = p;
 	}
 
-	void put_long(long long n)
+	void put(long long n)
 	{
 		TRACE(" long(%ld)\n", n);
 		p = cbor_write_long(q, size - base, n);
@@ -2179,7 +2179,7 @@ public:
 		q = p;
 	}
 
-	void put_text(char* s)
+	void put(char* s)
 	{
 		TRACE(" text('%s')\n", s);
 		p = cbor_write_text(q, size - base, s);
@@ -2188,7 +2188,7 @@ public:
 		q = p;
 	}
 
-	void put_bytes(unsigned char* bytes, int m)
+	void put(unsigned char* bytes, int m)
 	{
 		TRACE(" bytes([%d]:", m);
 		for (int i = 0; i < m; i++)
@@ -2224,19 +2224,19 @@ int main(int argc, char** argv)
 
 	printf("\ncbor put:\n");
 	CBOR cbor(data, size);
-	cbor.put_map(2);
-	cbor.put_text("data");
+	cbor.def_map(2);
+	cbor.put("data");
 	unsigned char bytes[] = { 0x01,0x02,0x03,0x04,0x05,0x07 };
-	cbor.put_bytes(bytes, sizeof(bytes)); // size of data (in bytes);
-	cbor.put_text("foo");
-	cbor.put_int(1234);
-	cbor.put_array(5);
-	cbor.put_int(123);
-	cbor.put_text("hello");
-	cbor.put_text("world");
-	cbor.put_int(1231231231);
-	cbor.put_long(12312312311ULL);
-	cbor.put_text("f:D");
+	cbor.put(bytes, sizeof(bytes)); // size of data (in bytes);
+	cbor.put("foo");
+	cbor.put(1234);
+	cbor.def_array(5);
+	cbor.put(123);
+	cbor.put("hello");
+	cbor.put("world");
+	cbor.put(1231231231);
+	cbor.put(12312312311ULL);
+	cbor.put("f:D");
 	int base = cbor.base;
 
 	printf("\ncbor data:\n");
@@ -2283,7 +2283,23 @@ int main(int argc, char** argv)
 #define ERR_NLIP_HDR_BAD		-7
 #define ERR_NLIP_NO_LF			-8
 
-char tflag = 0;  						// test mode off
+char* ifile = NULL;						// upload image input filename
+char ifname[80];
+
+char oflag = 0;  						// capture send output 
+char* ofile = NULL;						// capture send output filename
+char ofname[80];
+
+char tflag = 0;  						// load send input
+
+char lflag = 0;  						// log text output 
+char* lfile = NULL;						// log text output filename
+char lfname[80];
+
+int port = 0;							// COM port number
+
+char nflag = 0;							// send HCI commands to enable NMP mode
+char rflag = 0;							// send NMP reset command
 
 BASEFILE bf;
 
@@ -2353,6 +2369,10 @@ int recv_buf(unsigned char *buf, int size, int count, int ch)
 void send_buf(unsigned char *buf, int n)
 {
 	//MEM_Trace(buf, n, 0L);
+	if (!com->IsConnected())
+	{
+		return;
+	}
 	if (!com->Write((LPSTR)buf, n))
 	{
 		printf("send_buf: Write error!\n");
@@ -2396,6 +2416,11 @@ void TraceNmpHdr(nmp_hdr_t* hdr)
 
 int recv_nmp_resp(unsigned char *dec, int size, uint8_t Op, uint16_t Group, uint8_t Id)
 {
+	if (!com->IsConnected())
+	{
+		return 0;
+	}
+
 	unsigned char enc[256];
 	int len;
 	// Receive the type of the NLIP packet (ie. the first 2 bytes):
@@ -2532,14 +2557,22 @@ unsigned char* load_file(char* filename, long* size)
 	== = End base64 encoding == =
 	offset ? : 0x0a (newline)
 */
-int nmp_download(char *fndata, char *fnimage)
+int nmp_download(char *fndata)
 {
 	unsigned char dec[520];
 	long count = 0;		// NMP packet counter
 	long j = 0;			// file data[] offset
 	unsigned int len = 0;
+	char fnimage[80];
 
-	//TRACE("nmp_download(%s, %s)\n", fndata, fnimage);
+	TRACE("nmp_download(%s)\n", fndata);
+	strcpy(fnimage, fndata);
+	char *p = strchr(fnimage, '.');
+	if (p)
+	{
+		p++;
+		strcpy(p, "img");
+	}
 	printf("Output image to file '%s'\n", fnimage);
 	BASEFILE bf;
 	bf.InitWriteFile(fnimage);
@@ -2721,28 +2754,28 @@ int send_nmp_pkt(unsigned char *buf, int size, uint8_t Op, uint16_t Group, uint8
 	//TRACE("send_nmp_pkt Op=%x Group=%x Id=%x offset=%04x nbytes=%x\n", Op, Group, Id, offset, nbytes);
 	// Start of CBOR encoded data:
 	CBOR cbor(&buf[2 + sizeof(nmp_hdr_t)], sizeof(buf) - 2 - sizeof(nmp_hdr_t));
-	cbor.put_map(5);
-	cbor.put_text("data");
-	cbor.put_bytes(&bytes_data[offset], nbytes); // size of data (in bytes);
-	cbor.put_text("image");
-	cbor.put_int(0);
+	cbor.def_map(5);
+	cbor.put("data");
+	cbor.put(&bytes_data[offset], nbytes); // size of data (in bytes);
+	cbor.put("image");
+	cbor.put(0);
 	if (offset == 0)
 	{
-		cbor.put_text("len");
-		cbor.put_int(total_len);
+		cbor.put("len");
+		cbor.put(total_len);
 	}
-	cbor.put_text("off");
-	cbor.put_int(offset);
+	cbor.put("off");
+	cbor.put((int)offset);
 	if (offset == 0)
 	{
-		cbor.put_text("sha");
-		cbor.put_bytes(bytes_sha, sizeof(bytes_sha));
+		cbor.put("sha");
+		cbor.put(bytes_sha, sizeof(bytes_sha));
 	}
 	int j = nmp_format_buf(buf, sizeof(buf), Op, Group, Id, &cbor);
 
 	send_buf(buf, j);
 
-	if (tflag)
+	if (!tflag && oflag) 
 	{
 		// Capture all serial output to a file to be used to verify correct operation.
 		bf.WritetoFile((DWORD)j, (BYTE*)buf);
@@ -2787,7 +2820,7 @@ int nmp_imagelist(void)
 
 	// Format the NMP Image List command buf[].
 	CBOR cbor(&buf[2 + sizeof(nmp_hdr_t)], sizeof(buf) - 2 - sizeof(nmp_hdr_t));
-	cbor.put_map(0);
+	cbor.def_map(0);
 	int base = cbor.base;
 	int j = nmp_format_buf(buf, sizeof(buf), 0x00, 0x0001, 0x00, &cbor);
 
@@ -2822,7 +2855,7 @@ int nmp_reset(void)
 
 	// Format the NMP Reset command buf[].
 	CBOR cbor(&buf[2 + sizeof(nmp_hdr_t)], sizeof(buf) - 2 - sizeof(nmp_hdr_t));
-	cbor.put_map(0);
+	cbor.def_map(0);
 	int base = cbor.base;
 	int j = nmp_format_buf(buf, sizeof(buf), 0x02, 0x0000, 0x05, &cbor);
 
@@ -2845,24 +2878,12 @@ int nmp_reset(void)
 	return 0;
 }
 
-int nmp_upload(char *fnimage, char *fndata)
+int nmp_upload(char *fnimage)
 {
-	if (tflag)
-	{
-		bf.InitWriteFile(fndata);
-		if (!bf.IsFile())
-		{
-			return ERR_FILE_NOT_FOUND;
-		}
-	}
 	/* Dumb resource intensive way is to read the whole file into a large data buffer! */
 	unsigned char* data = load_file(fnimage, &total_len);
 	if (data == NULL)
 	{
-		if (tflag)
-		{
-			bf.CloseFile();
-		}
 		return ERR_LOAD_FAILURE;
 	}
 
@@ -2907,28 +2928,37 @@ int nmp_upload(char *fnimage, char *fndata)
 	}
 	printf("EOF\n");
 	delete data;
-	if (tflag)
-	{
-		bf.CloseFile();
-	}
 	return 0;
 }
 
-char* lfile = NULL;						// debug log text output filename
-char* ifile = NULL;						// upload image input filename
-char oflag = 0;  						// save send output 
-char* ofile = NULL;						// send output filename (captured data stream)
+#if 0
+int _main(int argc, char* argv[]);
 
-char lfname[80];
-char ifname[80];
-char ofname[80];
-
-int port = 0;							// COM port number
-char nflag = 0;							// send HCI commands to enable NMP mode
-char rflag = 0;							// send NMP reset command
+int main(int argc, char* argv[])
+{
+	argc = 0;
+	argv[argc++] = "winlib";
+	argv[argc++] = "-d";
+	argv[argc++] = "-p26";
+	//argv[argc++] = "blehci";			// ifile
+	//argv[argc++] = "-l";				//-"lwinlib.log";
+	argv[argc++] = "-n";
+	argv[argc++] = "-r";
+	//argv[argc++] = "-t";
+	//argv[argc++] = "-ocapture";
+	//argv[argc++] = "-q";
+	//argv[argc++] = "-h";
+	return _main(argc, argv);
+}
 
 int _main(int argc, char* argv[])
 {
+#else
+
+int main(int argc, char* argv[])
+{
+#endif
+
 	char* p;
 	int i;
 	int rc = 0;
@@ -2952,6 +2982,7 @@ int _main(int argc, char* argv[])
 					break;
 
 				case 'l':
+					lflag++;
 					if (strlen(p + 1))
 					{
 						lfile = p + 1;
@@ -2967,7 +2998,7 @@ int _main(int argc, char* argv[])
 					p = " ";
 					break;
 
-				case 'c':
+				case 'p':
 					if (strlen(p + 1))
 					{
 						port = atoi(p + 1);
@@ -2997,10 +3028,11 @@ int _main(int argc, char* argv[])
 
 				default:
 					fprintf(stderr, "Usage: %s [-i][file] [-o][file] [-l][file] [-c] [-e] [-d]\n", argv[0]);
-					fprintf(stderr, "[-i][file] source image input\n");
-					fprintf(stderr, "-o[file]   binary output\n");
-					fprintf(stderr, "-cn        COM port number\n");
-					fprintf(stderr, "-t         test mode\n");
+					fprintf(stderr, "[-i][file] image upload\n");
+					fprintf(stderr, "-o[file]   capture output\n");
+					fprintf(stderr, "-l[file]   log debug output\n");
+					fprintf(stderr, "-pn        COM port number\n");
+					fprintf(stderr, "-t         test capture\n");
 					fprintf(stderr, "-d         dump data output\n");
 					fprintf(stderr, "-n         send HCI commands to enable NMP mode\n");
 					fprintf(stderr, "-r         send NMP reset command\n");
@@ -3022,10 +3054,10 @@ int _main(int argc, char* argv[])
 			strcat(ifname, ".img");
 		}
 		ifile = ifname;
-		DEBUG("ifile='%s'\n", ifile);
+		fprintf(stdout, "ifile='%s'\n", ifile);
 	}
 	else
-		DEBUG("ifile=stdin\n");
+		fprintf(stdout, "ifile=stdin\n");
 
 	if (oflag)
 	{
@@ -3037,29 +3069,57 @@ int _main(int argc, char* argv[])
 				strcat(ofname, ".out");
 			}
 			ofile = ofname;
-			DEBUG("ofile='%s'\n", ofile);
+			fprintf(stdout, "ofile='%s'\n", ofile);
 		}
 		else
-			DEBUG("ofile=stdout\n");
+			fprintf(stdout, "ofile=stdout\n");
 	}
 
-	if (lfile)
+	if (lflag)
 	{
+		if (!lfile)
+		{
+			lfile = argv[0];
+		}
 		strcpy(lfname, lfile);
 		if (!strchr(lfile, '.'))
 		{
 			strcat(lfname, ".log");
 		}
 		lfile = lfname;
-		DEBUG("lfile='%s'\n", lfile);
+		fprintf(stdout, "lfile='%s'\n", lfile);
 	}
 	else
-		DEBUG("lfile=stdout\n");
+		fprintf(stdout, "lfile=NULL\n");
 
 	// Open log file to capture output from putchar, puts and printf macros.
 	LOG_Init(lfile);
 
 	TMR_Init(100);	// 100ms timebase
+
+	if (oflag)
+	{
+		if (!tflag)
+		{
+			printf("Capture upload to file '%s'\n", ofile);
+			bf.InitWriteFile(ofile);
+			if (!bf.IsFile())
+			{
+				printf("File Not Found!\n");
+				goto err;
+			}
+		}
+		else
+		{
+			printf("Read download from file '%s'\n", ofile);
+			bf.InitReadFile(ofile);
+			if (!bf.IsFile())
+			{
+				printf("File Not Found!\n");
+				goto err;
+			}
+		}
+	}
 
 	if (port != 0)
 	{
@@ -3086,6 +3146,15 @@ int _main(int argc, char* argv[])
 				}
 				else
 				{
+					unsigned char buf[256];
+					/* Ignore any spurious data sent from the bootloader. */
+					recv_buf(buf, sizeof(buf), 100, -1);
+					TRACE("Send <CR>\n");
+					/* Sending a <CR> can help in resynchronizing the NMP serial link. */
+					buf[0] = 0x0d;
+					send_buf(buf, 1);
+					TMR_Delay(1);
+
 					COM_Term();
 					rc = ERR_HCI_TIMEOUT;
 					goto err;
@@ -3120,7 +3189,7 @@ int _main(int argc, char* argv[])
 
 			if (ifile)
 			{
-				rc = nmp_upload(ifile, "send.bin");
+				rc = nmp_upload(ifile);
 				if (rc < 0)
 				{
 					COM_Term();
@@ -3145,9 +3214,9 @@ int _main(int argc, char* argv[])
 		}
 		COM_Term();
 	}
-	if (tflag)
+	if (tflag && oflag)
 	{
-		rc = nmp_download("send.bin", ofile);
+		rc = nmp_download(ofile);
 		if (rc < 0)
 		{
 			goto err;
@@ -3155,30 +3224,15 @@ int _main(int argc, char* argv[])
 	}
 
 err:
+	if (oflag)
+	{
+		bf.CloseFile();
+	}
 	TMR_Term();
 
 	// Close capture log file.
 	LOG_Term();
 
 	return rc;
-}
-
-int main(int argc, char* argv[])
-{
-#if 0
-	argc = 0;
-	argv[argc++] = "winlib";
-	argv[argc++] = "-c26";
-	argv[argc++] = "blehci.img";		// ifile
-	argv[argc++] = "-lwinlib.log";		// lfile
-	argv[argc++] = "-n";
-	argv[argc++] = "-d";
-	argv[argc++] = "-r";
-	argv[argc++] = "-t";
-	argv[argc++] = "-o";				//"-orecv.img";
-	argv[argc++] = "-q";
-	//argv[argc++] = "-h";
-#endif
-	return _main(argc, argv);
 }
 #endif
