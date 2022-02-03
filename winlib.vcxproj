@@ -171,14 +171,13 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="crc.c" />
-    <ClCompile Include="ecc.c" />
     <ClCompile Include="src\active.cpp" />
     <ClCompile Include="src\base64\base64.c" />
     <ClCompile Include="src\BASEFILE.CPP" />
     <ClCompile Include="src\cbor\cbor.c" />
     <ClCompile Include="src\CIRCBUF.CPP" />
     <ClCompile Include="src\comport.cpp" />
+    <ClCompile Include="src\crc.c" />
     <ClCompile Include="src\dhara\error.c" />
     <ClCompile Include="src\dhara\journal.c" />
     <ClCompile Include="src\dhara\map.c" />

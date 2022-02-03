@@ -38,13 +38,6 @@ int dflag = false;
 //#define TMR_TESTING
 //#define MDM_TESTING
 //#define FTL_TESTING
-#ifdef COM_TESTING
-#define SEND_IMAGE
-//#define SAVE_DATA
-#endif
-#ifdef SAVE_DATA
-BASEFILE bf;
-#endif
 
 /* xScript Rx initial timeout maximum value. */
 #define TMR_TIMEOUT_MAX	32000
@@ -993,7 +986,6 @@ SCRIPT spt;
 
 char cflag = 0;  						// compile script
 char eflag = 0;  						// execute script
-char dflag = 0;  						// dump data output
 char qflag = 0;  						// quiet mode
 char *lfile = NULL;						// debug log text output filename
 char *ifile = NULL;						// script source text input filename
@@ -1994,6 +1986,47 @@ cbor_token_t* cbor_get_key(char* s)
 	return NULL;
 }
 
+char* cbor_typetostr(int type)
+{
+	switch (type)
+	{
+	case CBOR_TOKEN_TYPE_ERROR:
+		return "ERROR";
+	case CBOR_TOKEN_TYPE_INCOMPLETE:
+		return "INCOMPLETE";
+	case CBOR_TOKEN_TYPE_INT:
+		return "INT";
+	case CBOR_TOKEN_TYPE_LONG:
+		return "LONG";
+	case CBOR_TOKEN_TYPE_MAP:
+		return "MAP";
+	case CBOR_TOKEN_TYPE_ARRAY:
+		return "ARRAY";
+	case CBOR_TOKEN_TYPE_TEXT:
+		return "TEXT";
+	case CBOR_TOKEN_TYPE_BYTES:
+		return "BYTES";
+	case CBOR_TOKEN_TYPE_TAG:
+		return "TAG";
+	case CBOR_TOKEN_TYPE_SPECIAL:
+		return "SPECIAL";
+	case CBOR_TOKEN_TYPE_BREAK:
+		return "BREAK";
+	default:
+		return "UNKNOWN";
+	}
+}
+
+void cbor_list_all(void)
+{
+	printf("%d tokens found:\n", token_cnt);
+	cbor_token_t* token = tokens;
+	for (int i = 0; i < token_cnt; i++, token++)
+	{
+		printf("%2d:\t%d=CBOR_TOKEN_TYPE_%s\n", i, token->type, cbor_typetostr(token->type));
+	}
+}
+
 int cbor_parse(unsigned char* data, int size)
 {
 	unsigned int offset = 0;
@@ -2106,6 +2139,7 @@ public:
 		base = 0L;
 		size = n;
 		q = bfr;
+		p = q;
 		//TRACE("bfr @%xH size=%d\n", bfr, size);
 	}
 
@@ -2118,34 +2152,10 @@ public:
 		q = p;
 	}
 
-	void put_text(char* s)
-	{
-		TRACE(" text('%s')\n", s);
-		p = cbor_write_text(q, size - base, s);
-		MEM_Trace(q, p - q, base);
-		base += p - q;
-		q = p;
-	}
-
-
 	void put_array(int m)
 	{
 		TRACE(" array(%d)", m);
 		p = cbor_write_array(q, size - base, m);
-		MEM_Trace(q, p - q, base);
-		base += p - q;
-		q = p;
-	}
-
-	void put_bytes(unsigned char* bytes, int m)
-	{
-		TRACE(" bytes([%d]:", m);
-		for (int i = 0; i < m; i++)
-		{
-			TRACE("%02x ", bytes[i]);
-		}
-		TRACE("\n");
-		p = cbor_write_bytes(q, size - base, bytes, m);
 		MEM_Trace(q, p - q, base);
 		base += p - q;
 		q = p;
@@ -2169,6 +2179,29 @@ public:
 		q = p;
 	}
 
+	void put_text(char* s)
+	{
+		TRACE(" text('%s')\n", s);
+		p = cbor_write_text(q, size - base, s);
+		MEM_Trace(q, p - q, base);
+		base += p - q;
+		q = p;
+	}
+
+	void put_bytes(unsigned char* bytes, int m)
+	{
+		TRACE(" bytes([%d]:", m);
+		for (int i = 0; i < m; i++)
+		{
+			TRACE("%02x ", bytes[i]);
+		}
+		TRACE("\n");
+		p = cbor_write_bytes(q, size - base, bytes, m);
+		MEM_Trace(q, p - q, base);
+		base += p - q;
+		q = p;
+	}
+
 	~CBOR()
 	{
 		//TRACE("bfr len=%d:\n", base);
@@ -2179,47 +2212,6 @@ public:
 #include <stdio.h>
 
 char qflag = 0;  						// quiet mode off (output to window)
-
-char* cbor_typetostr(int type)
-{
-	switch (type)
-	{
-	case CBOR_TOKEN_TYPE_ERROR:
-		return "ERROR";
-	case CBOR_TOKEN_TYPE_INCOMPLETE:
-		return "INCOMPLETE";
-	case CBOR_TOKEN_TYPE_INT:
-		return "INT";
-	case CBOR_TOKEN_TYPE_LONG:
-		return "LONG";
-	case CBOR_TOKEN_TYPE_MAP:
-		return "MAP";
-	case CBOR_TOKEN_TYPE_ARRAY:
-		return "ARRAY";
-	case CBOR_TOKEN_TYPE_TEXT:
-		return "TEXT";
-	case CBOR_TOKEN_TYPE_BYTES:
-		return "BYTES";
-	case CBOR_TOKEN_TYPE_TAG:
-		return "TAG";
-	case CBOR_TOKEN_TYPE_SPECIAL:
-		return "SPECIAL";
-	case CBOR_TOKEN_TYPE_BREAK:
-		return "BREAK";
-	default:
-		return "UNKNOWN";
-	}
-}
-
-void cbor_list_all(void)
-{
-	printf("%d tokens found:\n", token_cnt);
-	cbor_token_t* token = tokens;
-	for (int i = 0; i < token_cnt; i++, token++)
-	{
-		printf("%2d:\t%d=CBOR_TOKEN_TYPE_%s\n", i, token->type, cbor_typetostr(token->type));
-	}
-}
 
 int main(int argc, char** argv)
 {
@@ -2282,36 +2274,42 @@ int main(int argc, char** argv)
 #include "src/cbor/cbor.h"
 #include "src/BASEFILE.HPP"
 
+#define ERR_HCI_TIMEOUT			-1
+#define ERR_NMP_TIMEOUT			-2
+#define ERR_NMP_DECODE			-3
+#define ERR_NMP_HDR_BAD			-4
+#define ERR_FILE_NOT_FOUND		-5
+#define ERR_LOAD_FAILURE		-6
+#define ERR_NLIP_HDR_BAD		-7
+#define ERR_NLIP_NO_LF			-8
+
+char tflag = 0;  						// test mode off
+
+BASEFILE bf;
+
 #define BUFSIZE		512
 
-//extern "C" void init_crctable();
-//extern "C" unsigned int crc16_buf(unsigned char* bufptr, int buflen, unsigned int crc);
 extern "C" uint16_t crc_xmodem(const unsigned char* input_str, size_t num_bytes);
 
 char qflag = 0;  						// quiet mode off (output to window)
 
-//unsigned char Cmd_ImageList[] = { 
-//	0x00,0x0b,0x00,0x00,0x00,0x01,0x00,0x01, 0x42,0x00,0xa0,0xf5,0x33 };
-
-//unsigned char Cmd_Reset[]     = { 
-//	0x00,0x0b,0x02,0x00,0x00,0x01,0x00,0x00, 0x42,0x05,0xa0,0xba,0x15 };
-
 unsigned char bytes_sha[32] = {
 	0x6c,0x5a,0x2b,0x11,0x0d,0xdc,0xc0,0xa2, 0x91,0xf0,0xd0,0x6c,0xa0,0x0d,0x2f,0xb0,
 	0xe9,0x4c,0x63,0x10,0x0a,0x00,0x72,0x14, 0x12,0xe3,0xff,0xc0,0x35,0xd0,0xbe,0x2f };
+
 
 int recv_buf(unsigned char *buf, int size, int count, int ch)
 {
 	int i = 0;
 	int delay = 50;
 	bool done = false;
-	TRACE("recv_buf(@%08x, %d, %d, %d){\n", buf, size, count, ch);
+	TRACE("recv_buf(@%08x, %d, %d, %d){", buf, size, count, ch);
 	while (!done && count > 0)
 	{
 		int n = com->RxCount();
 		if (n > 0)
 		{
-			for (int i=0; i < n && count > 0; i++, count--)
+			for (int i=0; i < n && !done && count > 0; i++, count--)
 			{
 				int c;
 				c = com->RxGetch();
@@ -2323,7 +2321,6 @@ int recv_buf(unsigned char *buf, int size, int count, int ch)
 				}
 				if (c == ch)
 				{
-					TRACE("<CR>\n");
 					done = true;
 					break;
 				}
@@ -2349,7 +2346,7 @@ int recv_buf(unsigned char *buf, int size, int count, int ch)
 			}
 		}
 	}
-	TRACE("} return count=%d\n", count);
+	TRACE("} return count=%x\n", count);
 	return count;
 }
 
@@ -2379,11 +2376,11 @@ typedef struct nmp_hdr
 	unsigned char Id;
 } nmp_hdr_t;
 
-typedef struct nmp_packet
+typedef struct nmp_pkt
 {
 	nmp_hdr_t hdr;
 	unsigned char data[0];
-} nmp_packet_t;
+} nmp_pkt_t;
 
 #define swapbytes(n)	((n&0xFF)<<8)+(n>>8)
 
@@ -2397,53 +2394,50 @@ void TraceNmpHdr(nmp_hdr_t* hdr)
 		hdr->Op, hdr->Flags, swapbytes(hdr->Len), swapbytes(hdr->Group), hdr->Seq, hdr->Id);
 }
 
-int recv_nmp_resp(void)
+int recv_nmp_resp(unsigned char *dec, int size, uint8_t Op, uint16_t Group, uint8_t Id)
 {
-#ifdef SEND_IMAGE
-	unsigned char dec[128];
-	char enc[128];
+	unsigned char enc[256];
 	int len;
-	if (recv_buf((unsigned char *)enc, sizeof(enc), 2, -1) != 0)
+	// Receive the type of the NLIP packet (ie. the first 2 bytes):
+	if (recv_buf(enc, sizeof(enc), 2, -1) != 0)
 	{
 		printf("rx: Timeout!");
-		return -1;
+		return ERR_NMP_TIMEOUT;
 	}
-	//TRACE("rx: %02x %02x\n", enc[0], enc[1]);
-	// Receive remainder of packet:
-	len = 50 - recv_buf((unsigned char *)enc, sizeof(enc), 50, '\r');
-	enc[len] = '\0';
-	//TRACE("rx: '%s'\n", enc);
+	TRACE("rx: %02x %02x\n", enc[0], enc[1]);
+	// Receive body of the NLIP packet (ie. ascii text that is terminated with a <LF>):
+	int k = recv_buf(enc, sizeof(enc), sizeof(enc) - 1, '\r');
+		len = (sizeof(enc) - 1) - k;
+	enc[len] = '\0';	// remove anything after the trailing <LF>
+	TRACE("rx: '%s'\n", enc);
 	int m;
-	//m = base64_decode_len(enc);
-	m = base64_decode(enc, dec);
+	//m = base64_decode_len((char *)enc);
+	m = base64_decode((char *)enc, dec);
+	if (m <= 0)
+	{
+		printf("rx: Decode failure!\n");
+		return ERR_NMP_DECODE;
+	}
 	//MEM_Trace(dec, m, 0L);
 	// NMP header (8-bytes):
 	len = swapbytes(*(uint16_t*)&dec[0]);
-	//TRACE("nmp len=%04x\n", len);
-	nmp_hdr_t* hdr = (nmp_hdr_t*)&dec[2];
+	TRACE("nmp len=%04x ", len);
+	struct nmp_pkt* pkt = (struct nmp_pkt*)&dec[2];
+	nmp_hdr_t* hdr = &pkt->hdr;
 	len = swapbytes(hdr->Len);
-	//TRACE("hdr len=%04x\n", len);
-#if 0
+	TRACE(" hdr len=%04x\n", len);
 	TRACE("rx: ");
 	TraceNmpHdr(hdr);
-#else
-	int k = swapbytes(hdr->Len);
-	if (hdr->Flags != 0x00 || k > 13 || hdr->Id != 0x01)
+	if (hdr->Flags != 0x00 || hdr->Op != Op || swapbytes(hdr->Group) != Group || hdr->Id != Id)
 	{
 		printf("rx: Bad hdr! Op:%d Flags:%d Len:%d Group:%d Seq:%d Id:%d\n",
-			hdr->Op, hdr->Flags, k, swapbytes(hdr->Group), hdr->Seq, hdr->Id);
-		return -2;
+			hdr->Op, hdr->Flags, len, swapbytes(hdr->Group), hdr->Seq, hdr->Id);
+		return ERR_NMP_HDR_BAD;
 	}
-#endif
-	int offset = cbor_parse(&dec[2 + 8], len);
-	//unsigned int remaining = len - 8 - offset;
-	//TRACE("remaining=%x ", remaining);
-	//uint16_t crc = swapbytes(*(uint16_t *)&dec[2 + 8 + offset]);
-	//uint16_t crc = swapbytes(*(uint16_t *)&dec[m - 2]);
-	//TRACE("offset=%x\n", offset);
-	//TRACE("crc=%04x\n", crc);
-#endif
-	return 0;
+	uint16_t crc = swapbytes(*(uint16_t*)&dec[m - 2]);
+	int remaining = len - cbor_parse(pkt->data, len);
+	TRACE("crc=%04x remaining=%d\n", crc, remaining);
+	return remaining;
 }
 
 void InitNmpHdr(nmp_hdr_t* hdr, uint8_t Op, uint8_t Flags, uint16_t Len, uint16_t Group, uint8_t Seq, uint8_t Id)
@@ -2461,6 +2455,12 @@ typedef struct nlip_hdr
 	uint8_t type[2];
 } nlip_hdr_t;
 
+typedef struct nlip_pkt_t
+{
+	nlip_hdr hdr;
+	unsigned char data[0];
+} nlip_pkt_t;
+
 unsigned char* load_file(char* filename, long* size)
 {
 	BASEFILE bf;
@@ -2473,7 +2473,7 @@ unsigned char* load_file(char* filename, long* size)
 	bf.InitReadFile(filename);
 	if (!bf.IsFile())
 	{
-		printf("\nFile_Not_Found!\n");
+		printf("\nFile Not Found!\n");
 		return NULL;
 	}
 	long m = bf.Filesize();
@@ -2513,7 +2513,6 @@ unsigned char* load_file(char* filename, long* size)
 	return data;
 }
 
-#ifdef SAVE_DATA
 // Receive nmp packets from a file and recreate the image file.
 /*
 	offset 0:    0x06 0x09
@@ -2546,8 +2545,8 @@ int nmp_download(char *fndata, char *fnimage)
 	bf.InitWriteFile(fnimage);
 	if (!bf.IsFile())
 	{
-		printf("\nFile_Not_Found!\n");
-		return -1;
+		printf("\nFile Not Found!\n");
+		return ERR_FILE_NOT_FOUND;
 	}
 
 	long size;
@@ -2555,9 +2554,9 @@ int nmp_download(char *fndata, char *fnimage)
 	if (data == NULL)
 	{
 		printf("\nLoad data failed!\n");
-		return -2;
+		return ERR_LOAD_FAILURE;
 	}
-	printf("\nDownload:");
+	printf("Download:");
 
 	while (j <= size)
 	{
@@ -2589,7 +2588,7 @@ int nmp_download(char *fndata, char *fnimage)
 				MEM_Dump((unsigned char*)nlip_hdr, sizeof(nlip_hdr_t), j);
 				delete data;
 				bf.CloseFile();
-				return -3;
+				return ERR_NLIP_HDR_BAD;
 			}
 			j += sizeof(nlip_hdr_t);
 			char enc[520];
@@ -2602,7 +2601,7 @@ int nmp_download(char *fndata, char *fnimage)
 			{
 				printf("No <LF> found!\n");
 				delete data;
-				return -4;
+				return ERR_NLIP_NO_LF;
 			}
 			enc[i] = '\0';
 			TRACE("rx: %02x %02x '%s'<LF>\n", nlip_hdr->type[0], nlip_hdr->type[1], enc);
@@ -2660,13 +2659,66 @@ int nmp_download(char *fndata, char *fnimage)
 	delete data;
 	return 0;
 }
-#endif
+
+int nmp_format_buf(unsigned char* buf, int size, uint8_t Op, uint16_t Group, uint8_t Id, CBOR* cbor)
+{
+	int len;
+	nmp_hdr_t* hdr;
+
+	// Set NMP packet length (2-bytes):
+	*(uint16_t*)&buf[0] = swapbytes(cbor->base + sizeof(nmp_hdr_t) + 2);
+	MEM_Trace(&buf[0], sizeof(uint16_t), 0L);
+
+	// Set NMP packet header (8-bytes):
+	hdr = (nmp_hdr_t*)&buf[2];
+	InitNmpHdr(hdr, Op, 0x00, cbor->base, Group, seq, Id);
+	TRACE("tx: ");
+	TraceNmpHdr(hdr);
+
+	// Set NMP packet CRC16 (2-bytes):
+	unsigned int crc = 0;
+	crc = crc_xmodem(&buf[2], cbor->base + sizeof(nmp_hdr_t));
+	TRACE("crc16: %04x\n", crc);
+	*(uint16_t*)cbor->p = swapbytes(crc);
+	len = 2 + sizeof(nmp_hdr_t) + cbor->base + 2;
+	MEM_Trace(buf, len, 0L);
+
+	// Encode NMP packet with base64.
+	char enc[520];
+	cbor->base = base64_encode(buf, len, enc, 1);
+	TRACE("enc len=%d:\n", cbor->base);
+	MEM_Trace((unsigned char*)enc, cbor->base, 0L);
+
+	// Format packet for NLIP protocol by breaking into frames as needed.
+	unsigned char* ptr = buf;
+	int j = 0;
+	for (int i = 0, k = MGMT_NLIP_MAX_FRAME - 3; i < cbor->base; i += k)
+	{
+		// Break up packet frames that are <=127 bytes:
+		if ((i + k) >= cbor->base)
+			k = cbor->base - i;
+		if (i == 0)
+		{
+			*ptr++ = 0x06;
+			*ptr++ = 0x09;
+		}
+		else
+		{
+			*ptr++ = 0x04;
+			*ptr++ = 0x14;
+		}
+		strncpy((char*)ptr, &enc[i], k);
+		ptr += k;
+		*ptr++ = 0x0a;
+		j += 2 + k + 1;
+	}
+	return j;
+}
 
 // Transmit a nmp packet request
-int send_nmp_packet(uint8_t Op, uint16_t Group, uint8_t Id, unsigned int offset, int nbytes, unsigned char* bytes_data)
+int send_nmp_pkt(unsigned char *buf, int size, uint8_t Op, uint16_t Group, uint8_t Id, unsigned int offset, int nbytes, unsigned char* bytes_data)
 {
-	unsigned char buf[520];
-	//TRACE("send_nmp_packet Op=%x Group=%x Id=%x offset=%04x nbytes=%x\n", Op, Group, Id, offset, nbytes);
+	//TRACE("send_nmp_pkt Op=%x Group=%x Id=%x offset=%04x nbytes=%x\n", Op, Group, Id, offset, nbytes);
 	// Start of CBOR encoded data:
 	CBOR cbor(&buf[2 + sizeof(nmp_hdr_t)], sizeof(buf) - 2 - sizeof(nmp_hdr_t));
 	cbor.put_map(5);
@@ -2686,58 +2738,15 @@ int send_nmp_packet(uint8_t Op, uint16_t Group, uint8_t Id, unsigned int offset,
 		cbor.put_text("sha");
 		cbor.put_bytes(bytes_sha, sizeof(bytes_sha));
 	}
-	int base = cbor.base;
+	int j = nmp_format_buf(buf, sizeof(buf), Op, Group, Id, &cbor);
 
-	// NMP packet length (2-bytes):
-	*(uint16_t*)&buf[0] = swapbytes(base + sizeof(nmp_hdr_t) + 2);
-	//MEM_Trace(&buf[0], sizeof(uint16_t), 0L);
-	// NMP packet header (8-bytes):
-	nmp_hdr_t* hdr = (nmp_hdr_t*)&buf[2];
-	InitNmpHdr(hdr, Op, 0x00, base, Group, seq, Id);
-	TRACE("tx: ");
-	TraceNmpHdr(hdr);
-	// NMP packet CRC16 (2-bytes):
-	unsigned int crc = 0;
-	//crc = crc16_buf(&buf[2],base+sizeof(nmp_hdr_t), crc);
-	crc = crc_xmodem(&buf[2], base+sizeof(nmp_hdr_t));
-	//TRACE("crc16: %04x\n", crc);
-	*(uint16_t *)cbor.p = swapbytes(crc);
-	int len = 2 + sizeof(nmp_hdr_t) + base + 2;
-	//MEM_Trace(buf, len, 0L);
-	// Send NMP packet with NLIP protocol.
-	char enc[520];
-	base = base64_encode(buf, len, enc, 1);
-	//TRACE("enc len=%d:\n", base);
-	//MEM_Trace((unsigned char*)enc, base, 0L);
-	unsigned char *ptr = buf;
-	int j = 0;
-	for (int i=0,k=MGMT_NLIP_MAX_FRAME-3; i < base; i+=k)
-	{
-		// Break up packet frames that are <=127 bytes:
-		if ((i+k) >= base)
-			k = base-i;
-		if (i == 0)
-		{
-			*ptr++ = 0x06;
-			*ptr++ = 0x09;
-		}
-		else
-		{
-			*ptr++ = 0x04;
-			*ptr++ = 0x14;
-		}
-		strncpy((char*)ptr, &enc[i], k);
-		ptr += k;
-		*ptr++ = 0x0a;
-		j += 2 + k + 1;
-	}
-#ifdef SEND_IMAGE
 	send_buf(buf, j);
-#endif
-#ifdef SAVE_DATA
-	// Capture all serial output to a file to be used to verify correct operation.
-	bf.WritetoFile((DWORD)j, (BYTE*)buf);
-#endif
+
+	if (tflag)
+	{
+		// Capture all serial output to a file to be used to verify correct operation.
+		bf.WritetoFile((DWORD)j, (BYTE*)buf);
+	}
 	//MEM_Trace(buf, j, 0L);
 	seq += 1;
 	return j;
@@ -2764,98 +2773,31 @@ int send_hci_cmd(unsigned char *buf, int size, unsigned char* cmd, int txlen, in
 	return n;
 }
 
-int nmp_format_buf(unsigned char *buf, int size, uint8_t Op, uint16_t Group, uint8_t Id, CBOR* cbor)
-{
-	int len;
-	nmp_hdr_t* hdr;
-
-	// Set NMP packet length (2-bytes):
-	*(uint16_t*)&buf[0] = swapbytes(cbor->base + sizeof(nmp_hdr_t) + 2);
-	MEM_Trace(&buf[0], sizeof(uint16_t), 0L);
-
-	// Set NMP packet header (8-bytes):
-	hdr = (nmp_hdr_t*)&buf[2];
-	InitNmpHdr(hdr, Op, 0x00, cbor->base, Group, seq, Id);
-
-	// Set NMP packet CRC16 (2-bytes):
-	unsigned int crc = 0;
-	crc = crc_xmodem(&buf[2], cbor->base + sizeof(nmp_hdr_t));
-	TRACE("crc16: %04x\n", crc);
-	*(uint16_t*)cbor->p = swapbytes(crc);
-	len = 2 + sizeof(nmp_hdr_t) + cbor->base + 2;
-	MEM_Trace(buf, len, 0L);
-
-	// Encode NMP packet with base64.
-	char enc_str[256];
-	cbor->base = base64_encode(buf, len, enc_str, 1);
-	TRACE("enc len=%d:\n", cbor->base);
-	MEM_Trace((unsigned char*)enc_str, cbor->base, 0L);
-
-	// Format packet for NLIP protocol by breaking into frames as needed.
-	unsigned char* ptr = buf;
-	int j = 0;
-	for (int i = 0, k = MGMT_NLIP_MAX_FRAME - 3; i < cbor->base; i += k)
-	{
-		// Break up packet frames that are <=127 bytes:
-		if ((i + k) >= cbor->base)
-			k = cbor->base - i;
-		if (i == 0)
-		{
-			*ptr++ = 0x06;
-			*ptr++ = 0x09;
-		}
-		else
-		{
-			*ptr++ = 0x04;
-			*ptr++ = 0x14;
-		}
-		strncpy((char*)ptr, &enc_str[i], k);
-		ptr += k;
-		*ptr++ = 0x0a;
-		j += 2 + k + 1;
-	}
-	return j;
-}
-
 int nmp_imagelist(void)
 {
 	unsigned char buf[256];
-	unsigned char dec[256];
+
+	printf("Image List:\n");
+	//unsigned char dec[256];
 	//unsigned char NMP_ImageList[] = {
 	//	0x06,0x09,0x41,0x41,0x73,0x41,0x41,0x41, 0x41,0x42,0x41,0x41,0x46,0x43,0x41,0x4B,
 	//	0x44,0x31,0x4D,0x77,0x3D,0x3D,0x0A };
 	//int k = base64_decode((char*)&NMP_ImageList[2], dec);
 	//MEM_Trace(dec, k, 0L);
 
-	printf("Image List:\n");
 	// Format the NMP Image List command buf[].
 	CBOR cbor(&buf[2 + sizeof(nmp_hdr_t)], sizeof(buf) - 2 - sizeof(nmp_hdr_t));
 	cbor.put_map(0);
 	int base = cbor.base;
 	int j = nmp_format_buf(buf, sizeof(buf), 0x00, 0x0001, 0x00, &cbor);
-#ifdef SEND_IMAGE
+
 	// Transmit the command buf[].
 	send_buf(buf, j);
-	TMR_Delay(1);
-#endif
-	//MEM_Trace(buf, j, 0L);
 	seq += 1;
+	//MEM_Trace(buf, j, 0L);
 
 	// Receive the response buf[].
-	int n = sizeof(buf) - recv_buf(buf, sizeof(buf), sizeof(buf), '\r');
-	//MEM_Trace(buf, n, 0L);
-
-	// Decode the base64 response body.
-	int m = base64_decode((char*)&buf[2], dec);
-	//MEM_Trace(dec, m, 0L);
-	int len = (dec[0] << 8) + dec[1];
-	//TRACE("nmp len=%04x\n", len);
-	struct nmp_packet* pkt = (struct nmp_packet*)&dec[2];
-	nmp_hdr_t *hdr = &pkt->hdr;
-	TRACE("rx: ");
-	TraceNmpHdr(hdr);
-	cbor_parse(pkt->data, swapbytes(hdr->Len));
-	//TRACE("crc=%02x%02x\n", dec[m - 2], dec[m - 1]);
+	recv_nmp_resp(buf, sizeof(buf), 0x01, 0x0001, 0x00);
 
 	// Find keys pairs describing the image list (ignoring array of maps). 
 	cbor_token_t* token;
@@ -2869,48 +2811,35 @@ int nmp_imagelist(void)
 int nmp_reset(void)
 {
 	unsigned char buf[256];
-	unsigned char dec[256];
+
+	printf("Reset:\n");
+	//unsigned char dec[256];
 	//unsigned char NMP_Reset[] = {
 	//	0x06,0x09,0x41,0x41,0x73,0x43,0x41,0x41, 0x41,0x42,0x41,0x41,0x42,0x43,0x42,0x61,
 	//	0x43,0x36,0x46,0x51,0x3D,0x3D,0x0A };
 	//int k = base64_decode((char*)&NMP_Reset[2], dec);
 	//MEM_Trace(dec, k, 0L);
 
-	printf("Reset:\n");
 	// Format the NMP Reset command buf[].
 	CBOR cbor(&buf[2 + sizeof(nmp_hdr_t)], sizeof(buf) - 2 - sizeof(nmp_hdr_t));
 	cbor.put_map(0);
 	int base = cbor.base;
 	int j = nmp_format_buf(buf, sizeof(buf), 0x02, 0x0000, 0x05, &cbor);
-#ifdef SEND_IMAGE
+
 	// Transmit the command buf[].
 	send_buf(buf, j);
-	TMR_Delay(1);
-#endif
-	//MEM_Trace(buf, j, 0L);
 	seq += 1;
+	//MEM_Trace(buf, j, 0L);
 	
 	// Receive the response buf[].
-	int n = sizeof(buf) - recv_buf(buf, sizeof(buf), 100, '\r');
-	//MEM_Trace(buf, n, 0L);
-
-	// Decode the base64 response body.
-	int m = base64_decode((char*)&buf[2], dec);
-	//MEM_Trace(dec, m, 0L);
-	int len = (dec[0] << 8) + dec[1];
-	//TRACE("nmp len=%04x\n", len);
-	struct nmp_packet* pkt = (struct nmp_packet*)&dec[2];
-	nmp_hdr_t *hdr = &pkt->hdr;
-	TRACE("rx: ");
-	TraceNmpHdr(hdr);
-	cbor_parse(pkt->data, swapbytes(hdr->Len));
+	recv_nmp_resp(buf, sizeof(buf), 0x03, 0x0000, 0x05);
 	//TRACE("crc=%02x%02x\n", dec[m - 2], dec[m - 1]);
 
-	// Wait 5.5 seconds after a software reset for the Bootloader to startup.
+	// Wait >5 seconds after a software reset for the Bootloader to startup.
 	TMR_Delay(55);
 
 	// Check if the Bootloader signon has been received.
-	n = sizeof(buf) - recv_buf(buf, sizeof(buf), sizeof(buf), -1);
+	int n = sizeof(buf) - recv_buf(buf, sizeof(buf), sizeof(buf), -1);
 	buf[n] = '\0';
 	printf("%s\n", (char *)buf);
 	return 0;
@@ -2918,21 +2847,23 @@ int nmp_reset(void)
 
 int nmp_upload(char *fnimage, char *fndata)
 {
-#ifdef SAVE_DATA
-	bf.InitWriteFile(fndata);
-	if (!bf.IsFile())
+	if (tflag)
 	{
-		return -2;
+		bf.InitWriteFile(fndata);
+		if (!bf.IsFile())
+		{
+			return ERR_FILE_NOT_FOUND;
+		}
 	}
-#endif
 	/* Dumb resource intensive way is to read the whole file into a large data buffer! */
 	unsigned char* data = load_file(fnimage, &total_len);
 	if (data == NULL)
 	{
-#ifdef SAVE_DATA
-		bf.CloseFile();
-#endif
-		return -1;
+		if (tflag)
+		{
+			bf.CloseFile();
+		}
+		return ERR_LOAD_FAILURE;
 	}
 
 	/* Send NMP packets broken up into several NLIP serial chunks that have the NMP packet
@@ -2944,6 +2875,7 @@ int nmp_upload(char *fnimage, char *fndata)
 	** the last fragment of the image.
 	*/
 	printf("Upload:");
+	unsigned char buf[520];
 	unsigned int offset = 0;
 	int size;
 	long count = 0;
@@ -2951,8 +2883,8 @@ int nmp_upload(char *fnimage, char *fndata)
 	if ((offset + size) <= total_len)
 	{
 		printf(!(count++ % 32)? "\n." : ".");
-		send_nmp_packet(0x02, 0x0001, 0x01, offset, size, data);
-		recv_nmp_resp();
+		send_nmp_pkt(buf, sizeof(buf), 0x02, 0x0001, 0x01, offset, size, data);
+		recv_nmp_resp  (buf, sizeof(buf), 0x03, 0x0001, 0x01);
 		offset += size;
 
 		// Change to larger size packet.
@@ -2960,8 +2892,8 @@ int nmp_upload(char *fnimage, char *fndata)
 		while ((offset + size) <= total_len)
 		{
 			printf(!(count++ % 32) ? "\n." : ".");
-			send_nmp_packet(0x02, 0x0001, 0x01, offset, size, data);
-			recv_nmp_resp();
+			send_nmp_pkt(buf, sizeof(buf), 0x02, 0x0001, 0x01, offset, size, data);
+			recv_nmp_resp  (buf, sizeof(buf), 0x03, 0x0001, 0x01);
 			offset += size;
 		}
 	}
@@ -2969,76 +2901,284 @@ int nmp_upload(char *fnimage, char *fndata)
 	{
 		size = total_len - offset;
 		printf(!(count++ % 32) ? "\n." : ".");
-		send_nmp_packet(0x02, 0x0001, 0x01, offset, size, data);
-		recv_nmp_resp();
+		send_nmp_pkt(buf, sizeof(buf), 0x02, 0x0001, 0x01, offset, size, data);
+		recv_nmp_resp  (buf, sizeof(buf), 0x03, 0x0001, 0x01);
 		offset += size;
 	}
 	printf("EOF\n");
 	delete data;
-#ifdef SAVE_DATA
-	bf.CloseFile();
-#endif
+	if (tflag)
+	{
+		bf.CloseFile();
+	}
 	return 0;
 }
 
-int main(int argc, char* argv[])
+char* lfile = NULL;						// debug log text output filename
+char* ifile = NULL;						// upload image input filename
+char oflag = 0;  						// save send output 
+char* ofile = NULL;						// send output filename (captured data stream)
+
+char lfname[80];
+char ifname[80];
+char ofname[80];
+
+int port = 0;							// COM port number
+char nflag = 0;							// send HCI commands to enable NMP mode
+char rflag = 0;							// send NMP reset command
+
+int _main(int argc, char* argv[])
 {
-	// Open log file to capture output from putchar, puts and printf macros.
-	LOG_Init("winlib.log");
+	char* p;
+	int i;
+	int rc = 0;
 
-	TMR_Init(100);	// 10ms timebase
-	COM_Init(26, 115200);
-	TMR_Delay(5);
-
-	if (com->IsConnected())
+	for (i = 1; --argc > 0; i++)          // parse command line options
 	{
-		printf("Comport is connected!\n");
-
-		unsigned char HCI_SetUpload[] = {
-			0x01,0x04,0xfc,0x01,0x01 };
-
-		unsigned char HCI_Reset[] = {
-			0x01,0x02,0xfc,0x00 };
-
-		unsigned char buf[128];
-		int n;
-		if ((n = send_hci_cmd(buf, sizeof(buf), HCI_SetUpload, sizeof(HCI_SetUpload), 20)) != 0 &&
-			(n = send_hci_cmd(buf, sizeof(buf), HCI_Reset, sizeof(HCI_Reset), 40)) != 0)
+		p = argv[i];
+		if (*p == '-')
 		{
-			// No specific response expected from the HCI_Reset, however the 'nmgr>' debug text 
-			// is output, once the Bootloader is ready to accept NMP requests.
-			if (!strncmp("nmgr>\n", (char*)&buf[n - 6], 6))
+			while (*++p)
 			{
-				printf("nmgr ready\n");
+				switch (*p)
+				{
+				case 'o':
+					oflag++;
+					if (strlen(p + 1))
+					{
+						ofile = p + 1;
+					}
+					p = " ";
+					break;
+
+				case 'l':
+					if (strlen(p + 1))
+					{
+						lfile = p + 1;
+					}
+					p = " ";
+					break;
+
+				case 'i':
+					if (strlen(p + 1))
+					{
+						ifile = p + 1;
+					}
+					p = " ";
+					break;
+
+				case 'c':
+					if (strlen(p + 1))
+					{
+						port = atoi(p + 1);
+					}
+					p = " ";
+					break;
+
+				case 't':
+					tflag++;
+					break;
+
+				case 'n':
+					nflag++;
+					break;
+
+				case 'r':
+					rflag++;
+					break;
+
+				case 'd':
+					dflag++;
+					break;
+
+				case 'q':
+					qflag++;
+					break;
+
+				default:
+					fprintf(stderr, "Usage: %s [-i][file] [-o][file] [-l][file] [-c] [-e] [-d]\n", argv[0]);
+					fprintf(stderr, "[-i][file] source image input\n");
+					fprintf(stderr, "-o[file]   binary output\n");
+					fprintf(stderr, "-cn        COM port number\n");
+					fprintf(stderr, "-t         test mode\n");
+					fprintf(stderr, "-d         dump data output\n");
+					fprintf(stderr, "-n         send HCI commands to enable NMP mode\n");
+					fprintf(stderr, "-r         send NMP reset command\n");
+					fprintf(stderr, "-q         quiet mode\n");
+					exit(1);
+				}
 			}
 		}
 		else
 		{
-			unsigned char buf[256];
-			TMR_Delay(55);
-			/* Ignore any spurious data sent from the bootloader. */
-			recv_buf(buf, sizeof(buf), 100, -1);
-			TRACE("Send <CR>\n");
-			/* Sending a <CR> can help in resynchronizing the NMP serial link. */
-			buf[0] = 0x0d;
-			send_buf(buf, 1);
-			TMR_Delay(1);
+			ifile = p;
+		}
+	}
+	if (ifile)
+	{
+		strcpy(ifname, ifile);
+		if (!strchr(ifname, '.'))
+		{
+			strcat(ifname, ".img");
+		}
+		ifile = ifname;
+		DEBUG("ifile='%s'\n", ifile);
+	}
+	else
+		DEBUG("ifile=stdin\n");
+
+	if (oflag)
+	{
+		if (ofile)
+		{
+			strcpy(ofname, ofile);
+			if (!strchr(ofname, '.'))
+			{
+				strcat(ofname, ".out");
+			}
+			ofile = ofname;
+			DEBUG("ofile='%s'\n", ofile);
+		}
+		else
+			DEBUG("ofile=stdout\n");
+	}
+
+	if (lfile)
+	{
+		strcpy(lfname, lfile);
+		if (!strchr(lfile, '.'))
+		{
+			strcat(lfname, ".log");
+		}
+		lfile = lfname;
+		DEBUG("lfile='%s'\n", lfile);
+	}
+	else
+		DEBUG("lfile=stdout\n");
+
+	// Open log file to capture output from putchar, puts and printf macros.
+	LOG_Init(lfile);
+
+	TMR_Init(100);	// 100ms timebase
+
+	if (port != 0)
+	{
+		COM_Init(port, 115200);
+		TMR_Delay(5);
+
+		if (com->IsConnected())
+		{
+			printf("Comport is connected!\n");
+
+			if (nflag)
+			{
+				unsigned char HCI_SetUpload[] = {
+					0x01,0x04,0xfc,0x01,0x01 };
+
+				unsigned char HCI_Reset[] = {
+					0x01,0x02,0xfc,0x00 };
+
+				unsigned char buf[128];
+				int n;
+				if ((n = send_hci_cmd(buf, sizeof(buf), HCI_SetUpload, sizeof(HCI_SetUpload), 20)) != 0 &&
+					(n = send_hci_cmd(buf, sizeof(buf), HCI_Reset, sizeof(HCI_Reset), 40)) != 0)
+				{
+				}
+				else
+				{
+					COM_Term();
+					rc = ERR_HCI_TIMEOUT;
+					goto err;
+				}
+				// No specific response expected from the HCI_Reset, however the 'nmgr>' debug text 
+				// is output, once the Bootloader is ready to accept NMP requests.
+				if (!strncmp("nmgr>\n", (char*)&buf[n - 6], 6))
+				{
+					printf("nmgr>\n");
+				}
+			}
+			rc = nmp_imagelist();
+			if (rc < 0)
+			{
+				COM_Term();
+				goto err;
+			}
+#if 0
+			else
+			{
+				unsigned char buf[256];
+				TMR_Delay(55);
+				/* Ignore any spurious data sent from the bootloader. */
+				recv_buf(buf, sizeof(buf), 100, -1);
+				TRACE("Send <CR>\n");
+				/* Sending a <CR> can help in resynchronizing the NMP serial link. */
+				buf[0] = 0x0d;
+				send_buf(buf, 1);
+				TMR_Delay(1);
+			}
+#endif
+
+			if (ifile)
+			{
+				rc = nmp_upload(ifile, "send.bin");
+				if (rc < 0)
+				{
+					COM_Term();
+					goto err;
+				}
+				rc = nmp_imagelist();
+				if (rc < 0)
+				{
+					COM_Term();
+					goto err;
+				}
+			}
+			if (rflag)
+			{
+				rc = nmp_reset();
+				if (rc < 0)
+				{
+					COM_Term();
+					goto err;
+				}
+			}
+		}
+		COM_Term();
+	}
+	if (tflag)
+	{
+		rc = nmp_download("send.bin", ofile);
+		if (rc < 0)
+		{
+			goto err;
 		}
 	}
 
-	nmp_imagelist();
-	nmp_upload("blehci.img", "send.bin");
-	nmp_imagelist();
-	nmp_reset();
-#ifdef SAVE_DATA
-	nmp_download("send.bin", "recv.img");
-#endif
-	COM_Term();
+err:
 	TMR_Term();
 
 	// Close capture log file.
 	LOG_Term();
 
-	return 0;
+	return rc;
+}
+
+int main(int argc, char* argv[])
+{
+#if 0
+	argc = 0;
+	argv[argc++] = "winlib";
+	argv[argc++] = "-c26";
+	argv[argc++] = "blehci.img";		// ifile
+	argv[argc++] = "-lwinlib.log";		// lfile
+	argv[argc++] = "-n";
+	argv[argc++] = "-d";
+	argv[argc++] = "-r";
+	argv[argc++] = "-t";
+	argv[argc++] = "-o";				//"-orecv.img";
+	argv[argc++] = "-q";
+	//argv[argc++] = "-h";
+#endif
+	return _main(argc, argv);
 }
 #endif

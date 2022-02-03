@@ -170,10 +170,7 @@
     <ClCompile Include="src\cbor\cbor.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ecc.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="crc.c">
+    <ClCompile Include="src\crc.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
