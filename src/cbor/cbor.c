@@ -297,7 +297,7 @@ unsigned int cbor_read_token(unsigned char *data, unsigned int size, unsigned in
 
 unsigned char *cbor_write_type_size(unsigned char *data, unsigned int size, unsigned int type, unsigned int type_size) {
     type <<= 5;
-    if(type_size < 24) {
+    if(type_size < 32) {
         if(size < 1) {
             return data;
         }
