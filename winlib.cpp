@@ -2632,6 +2632,84 @@ void send_buf(unsigned char *buf, int n)
  */
 #define MGMT_NLIP_MAX_FRAME     127
 
+
+ // Mcu Manager operation codes
+typedef enum
+{
+	OP_READ = 0,
+	OP_READ_RSP = 1,
+	OP_WRITE = 2,
+	OP_WRITE_RSP = 3
+} nmp_op_codes_t;
+
+// Mcu Manager groups
+typedef enum
+{
+	GROUP_DEFAULT = 0,
+	GROUP_IMAGE = 1,
+	//GROUP_STATS = 2,
+	//GROUP_CONFIG = 3,
+	//GROUP_LOGS = 4,
+	//GROUP_CRASH = 5,
+	//GROUP_SPLIT = 6,
+	//GROUP_RUN = 7,
+	GROUP_FS = 8
+	//GROUP_PERUSER = 64,
+} nmp_groups_t;
+
+// Default manager command IDs
+typedef enum
+{
+	//DEFAULT_ID_ECHO = 0,
+	//DEFAULT_ID_CONS_ECHO_CTRL = 1,
+	//DEFAULT_ID_TASKSTATS = 2,
+	//DEFAULT_ID_MPSTATS = 3,
+	//DEFAULT_ID_DATETIME_STR = 4,
+	DEFAULT_ID_RESET = 5
+} nmp_default_ids_t;
+
+// Image manager command IDs
+typedef enum
+{
+    IMAGE_ID_STATE = 0,
+	IMAGE_ID_UPLOAD = 1,
+	//IMAGE_ID_FILE = 2
+	//IMAGE_ID_CORELIST = 3,
+	//IMAGE_ID_CORELOAD = 4,
+	//IMAGE_ID_ERASE = 5,
+	//IMAGE_ID_ERASE_STATE = 6
+} nmp_image_ids_t;
+
+// Stats manager command IDs
+//typedef enum
+//{
+//    STATS_ID_READ = 0,
+//    STATS_ID_LIST = 1
+//} nmp_stats_ids_t;
+
+// Config manager command IDs
+//typedef enum
+//{
+//	CONFIG_ID_CONFIG = 0
+//} nmp_config_ids_t;
+
+// Logs manager command IDs
+//typedef enum
+//{
+//    LOGS_ID_READ = 0,
+//	LOGS_ID_CLEAR = 1,
+//	LOGS_ID_APPEND = 2,
+//	LOGS_ID_MODULE_LIST = 3,
+//	LOGS_ID_LEVEL_LIST = 4,
+//	LOGS_ID_LOGS_LIST = 5
+//} nmp_logs_ids_t;
+
+// FS manager command IDs
+typedef enum
+{
+	FS_ID_FILE = 0
+} nmp_fs_ids_t;
+
 typedef struct nmp_hdr
 {
 	unsigned char Op;
@@ -2662,7 +2740,7 @@ void TraceNmpHdr(nmp_hdr_t* hdr)
 		hdr->Op, hdr->Flags, swapbytes(hdr->Len), swapbytes(hdr->Group), hdr->Seq, hdr->Id);
 }
 
-int recv_nmp_resp(unsigned char *dec, int size, uint8_t Op, uint16_t Group, uint8_t Id)
+int recv_nmp_rsp(unsigned char *dec, int size, uint8_t Op, uint16_t Group, uint8_t Id)
 {
 	if (!com->IsConnected())
 	{
@@ -3002,30 +3080,10 @@ int nmp_format_buf(unsigned char* buf, int size, uint8_t Op, uint16_t Group, uin
 	return j;
 }
 
-// Transmit a nmp packet request
-int send_nmp_pkt(unsigned char *buf, int size, uint8_t Op, uint16_t Group, uint8_t Id, unsigned int offset, int nbytes, unsigned char* bytes_data)
+int send_nmp_req(unsigned char *buf, int size, uint8_t Op, uint16_t Group, uint8_t Id, CBOR *cbor)
 {
-	//TRACE("send_nmp_pkt Op=%x Group=%x Id=%x offset=%04x nbytes=%x\n", Op, Group, Id, offset, nbytes);
-	// Start of CBOR encoded data:
-	cbor.Init(&buf[2 + sizeof(nmp_hdr_t)], sizeof(buf) - 2 - sizeof(nmp_hdr_t));
-	cbor.def_map(5);
-	cbor.put("data");
-	cbor.put(&bytes_data[offset], nbytes); // size of data (in bytes);
-	cbor.put("image");
-	cbor.put(0);
-	if (offset == 0)
-	{
-		cbor.put("len");
-		cbor.put(total_len);
-	}
-	cbor.put("off");
-	cbor.put((int)offset);
-	if (offset == 0)
-	{
-		cbor.put("sha");
-		cbor.put(bytes_sha, sizeof(bytes_sha));
-	}
-	int j = nmp_format_buf(buf, sizeof(buf), Op, Group, Id, &cbor);
+	//TRACE("send_nmp_req Op=%x Group=%x Id=%x\n", Op, Group, Id);
+	int j = nmp_format_buf(buf, sizeof(buf), Op, Group, Id, cbor);
 
 	send_buf(buf, j);
 
@@ -3060,30 +3118,26 @@ int send_hci_cmd(unsigned char *buf, int size, unsigned char* cmd, int txlen, in
 	return n;
 }
 
+// Transmit a nmp imagelist request
+static int send_imagelist(unsigned char *buf, int size)
+{
+	// Format the NMP Image List command buf[].
+	cbor.Init(&buf[2 + sizeof(nmp_hdr_t)], sizeof(buf) - 2 - sizeof(nmp_hdr_t));
+	cbor.def_map(0);
+	send_nmp_req(buf, sizeof(buf), OP_READ, GROUP_IMAGE, IMAGE_ID_STATE, &cbor);
+	if (recv_nmp_rsp(buf, sizeof(buf), OP_READ_RSP, GROUP_IMAGE, IMAGE_ID_STATE) != 0)
+	{
+		return -1;
+	}
+	return 0;
+}
+
 int nmp_imagelist(void)
 {
 	unsigned char buf[256];
 
 	printf("Image List:\n");
-	//unsigned char dec[256];
-	//unsigned char NMP_ImageList[] = {
-	//	0x06,0x09,0x41,0x41,0x73,0x41,0x41,0x41, 0x41,0x42,0x41,0x41,0x46,0x43,0x41,0x4B,
-	//	0x44,0x31,0x4D,0x77,0x3D,0x3D,0x0A };
-	//int k = base64_decode((char*)&NMP_ImageList[2], dec);
-	//MEM_Trace(dec, k, 0L);
-
-	// Format the NMP Image List command buf[].
-	cbor.Init(&buf[2 + sizeof(nmp_hdr_t)], sizeof(buf) - 2 - sizeof(nmp_hdr_t));
-	cbor.def_map(0);
-	int j = nmp_format_buf(buf, sizeof(buf), 0x00, 0x0001, 0x00, &cbor);
-
-	// Transmit the command buf[].
-	send_buf(buf, j);
-	seq += 1;
-	//MEM_Trace(buf, j, 0L);
-
-	// Receive the response buf[].
-	if (recv_nmp_resp(buf, sizeof(buf), 0x01, 0x0001, 0x00) != 0)
+	if (send_imagelist(buf, sizeof(buf)) != 0)
 	{
 		return -1;
 	}
@@ -3105,33 +3159,32 @@ int nmp_imagelist(void)
 	return 0;
 }
 
+// Transmit a nmp reset request
+static int send_reset(unsigned char *buf, int size)
+{
+	// Format the NMP Reset command buf[].
+	cbor.Init(&buf[2 + sizeof(nmp_hdr_t)], sizeof(buf) - 2 - sizeof(nmp_hdr_t));
+	cbor.def_map(0);
+	send_nmp_req(buf, size, OP_WRITE, GROUP_DEFAULT, DEFAULT_ID_RESET, &cbor);
+
+	// Receive the response buf[].
+	if (recv_nmp_rsp(buf, size, OP_WRITE_RSP, GROUP_DEFAULT, DEFAULT_ID_RESET) != 0)
+	{
+		return -1;
+	}
+	return 0;
+}
+
 int nmp_reset(void)
 {
 	unsigned char buf[256];
 
 	printf("Reset:\n");
-	//unsigned char dec[256];
-	//unsigned char NMP_Reset[] = {
-	//	0x06,0x09,0x41,0x41,0x73,0x43,0x41,0x41, 0x41,0x42,0x41,0x41,0x42,0x43,0x42,0x61,
-	//	0x43,0x36,0x46,0x51,0x3D,0x3D,0x0A };
-	//int k = base64_decode((char*)&NMP_Reset[2], dec);
-	//MEM_Trace(dec, k, 0L);
-
-	// Format the NMP Reset command buf[].
-	cbor.Init(&buf[2 + sizeof(nmp_hdr_t)], sizeof(buf) - 2 - sizeof(nmp_hdr_t));
-	cbor.def_map(0);
-	int j = nmp_format_buf(buf, sizeof(buf), 0x02, 0x0000, 0x05, &cbor);
-
-	// Transmit the command buf[].
-	send_buf(buf, j);
-	seq += 1;
-	//MEM_Trace(buf, j, 0L);
-	
-	// Receive the response buf[].
-	if (recv_nmp_resp(buf, sizeof(buf), 0x03, 0x0000, 0x05) != 0)
+	if (send_reset(buf, sizeof(buf)) != 0)
 	{
 		return -1;
 	}
+
 	// Wait >5 seconds after a software reset for the Bootloader to startup.
 	TMR_Delay(55);
 
@@ -3139,6 +3192,92 @@ int nmp_reset(void)
 	int n = sizeof(buf) - recv_buf(buf, sizeof(buf), sizeof(buf), -1);
 	buf[n] = '\0';
 	printf("%s\n", (char*)buf);
+	return 0;
+}
+
+// Transmit a nmp upload request
+static int send_upload(unsigned char *buf, int size, unsigned int offset, int nbytes, unsigned char* bytes_data)
+{
+	cbor.Init(&buf[2 + sizeof(nmp_hdr_t)], sizeof(buf) - 2 - sizeof(nmp_hdr_t));
+	cbor.def_map(5);
+	cbor.put("data");
+	cbor.put(&bytes_data[offset], nbytes); // size of data (in bytes);
+	cbor.put("image");
+	cbor.put(0);
+	if (offset == 0)
+	{
+		cbor.put("len");
+		cbor.put(total_len);
+	}
+	cbor.put("off");
+	cbor.put((int)offset);
+	if (offset == 0)
+	{
+		cbor.put("sha");
+		cbor.put(bytes_sha, sizeof(bytes_sha));
+	}
+	send_nmp_req(buf, size, OP_WRITE, GROUP_IMAGE, IMAGE_ID_UPLOAD, &cbor);
+
+	// Receive the response buf[].
+	if (recv_nmp_rsp(buf, sizeof(buf), OP_WRITE_RSP, GROUP_IMAGE, IMAGE_ID_UPLOAD) != 0)
+	{
+		return -1;
+	}
+	return 0;
+}
+
+typedef struct
+{
+	int rc;
+	int off;
+} upload_rsp_t;
+
+static int recv_upload(upload_rsp_t *rsp)
+{
+	// Find keys pair describing the return code. 
+	cbor_token_t* rc = cbor.get_key("rc");
+	if (rc == NULL)
+	{
+		printf("rx: No return code!\n");
+		return -2;
+	}
+	if (rc->int_value != 0)
+	{
+		printf("rx: Error rc=%d\n", rc->int_value);
+		return -3;
+	}
+	cbor_token_t* off = cbor.get_key("off");
+	if (rc == NULL)
+	{
+		printf("rx: No offset!\n");
+		return -4;
+	}
+	rsp->rc = rc->int_value;
+	rsp->off = off->int_value;
+	TRACE("rc:%d off:%d\n", rsp->rc, rsp->off);
+	return 0;
+}
+
+int send_upload_next(unsigned int offset, int *size, unsigned char *data)
+{
+	unsigned char buf[520];
+	upload_rsp_t rsp;
+	int rc;
+	*size = (*size == 0)? 0x0129 : 0x0154;
+	//TRACE("offset=%d size=%d %d > %d\n", offset, *size, offset + *size, total_len);
+	if ((offset + *size) > total_len)
+	{
+		*size = total_len - offset;
+	}
+	if (send_upload(buf, sizeof(buf), offset, *size, data) != 0)
+	{
+		return -1;
+	}
+	rc = recv_upload(&rsp);
+	if (rc < 0)
+	{
+		return rc;
+	}
 	return 0;
 }
 
@@ -3160,102 +3299,16 @@ int nmp_upload(char *fnimage)
 	** the last fragment of the image.
 	*/
 	printf("Upload:");
-	unsigned char buf[520];
-	unsigned int offset = 0;
-	int size;
 	long count = 0;
-	size = 0x0129;
-	if ((offset + size) <= total_len)
+	unsigned int offset = 0;
+	int size = 0;
+	do
 	{
-		printf(!(count++ % 32)? "\n." : ".");
-		send_nmp_pkt(buf, sizeof(buf), 0x02, 0x0001, 0x01, offset, size, data);
-		if (recv_nmp_resp(buf, sizeof(buf), 0x03, 0x0001, 0x01) != 0)
-		{
-			return -1;
-		}
-		// Find keys pair describing the return code. 
-		cbor_token_t* rc = cbor.get_key("rc");
-		if (rc == NULL)
-		{
-			printf("rx: No return code!\n");
-			return -2;
-		}
-		if (rc->int_value != 0)
-		{
-			printf("rx: Error rc=%d\n", rc->int_value);
-			return -3;
-		}
-		cbor_token_t* off = cbor.get_key("off");
-		if (rc == NULL)
-		{
-			printf("rx: No offset!\n");
-			return -4;
-		}
-		TRACE("rc:%d off:%d\n", rc->int_value, off->int_value);
-		offset += size;
-
-		// Change to larger size packet.
-		size = 0x0154;
-		while ((offset + size) <= total_len)
-		{
-			printf(!(count++ % 32) ? "\n." : ".");
-			send_nmp_pkt(buf, sizeof(buf), 0x02, 0x0001, 0x01, offset, size, data);
-			if (recv_nmp_resp(buf, sizeof(buf), 0x03, 0x0001, 0x01) != 0)
-			{
-				return -1;
-			}
-			// Find keys pair describing the return code. 
-			cbor_token_t* rc = cbor.get_key("rc");
-			if (rc == NULL)
-			{
-				printf("rx: No return code!\n");
-				return -2;
-			}
-			if (rc->int_value != 0)
-			{
-				printf("rx: Error rc=%d\n", rc->int_value);
-				return -3;
-			}
-			cbor_token_t* off = cbor.get_key("off");
-			if (rc == NULL)
-			{
-				printf("rx: No offset!\n");
-				return -4;
-			}
-			TRACE("rc:%d off:%d\n", rc->int_value, off->int_value);
-			offset += size;
-		}
-	}
-	if ((offset + size) > total_len)
-	{
-		size = total_len - offset;
 		printf(!(count++ % 32) ? "\n." : ".");
-		send_nmp_pkt(buf, sizeof(buf), 0x02, 0x0001, 0x01, offset, size, data);
-		if (recv_nmp_resp(buf, sizeof(buf), 0x03, 0x0001, 0x01) != 0)
-		{
-			return -1;
-		}
-		// Find keys pair describing the return code. 
-		cbor_token_t* rc = cbor.get_key("rc");
-		if (rc == NULL)
-		{
-			printf("rx: No return code!\n");
-			return -2;
-		}
-		if (rc->int_value != 0)
-		{
-			printf("rx: Error rc=%d\n", rc->int_value);
-			return -3;
-		}
-		cbor_token_t* off = cbor.get_key("off");
-		if (rc == NULL)
-		{
-			printf("rx: No offset!\n");
-			return -4;
-		}
-		TRACE("rc:%d off:%d\n", rc->int_value, off->int_value);
+		send_upload_next(offset, &size, data);
 		offset += size;
-	}
+	} 
+	while (offset < total_len);
 	printf("EOF\n");
 	delete data;
 	return 0;
