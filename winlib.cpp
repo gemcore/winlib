@@ -44,15 +44,15 @@ int dflag = false;
 
 ComPort *com = NULL;
 
-int rxpacket_len = 0;
-int rxpacket_cnt = 0;
-byte rxpacket[80];
-
 /*
 ** ComPort virtual thread processing function.
 */
 void ComPort::Process(void)
 {
+	//static int rxpacket_len = 0;
+	//static int rxpacket_cnt = 0;
+	static byte rxpacket[512];
+
 	/* Rx serial processing - rx data block received is put into circular buffer. */
 	int n = Read((LPSTR)rxpacket, sizeof(rxpacket) - 1);
 	if (n > 0)
@@ -2559,19 +2559,134 @@ unsigned char bytes_sha[32] = {
 	0x6c,0x5a,0x2b,0x11,0x0d,0xdc,0xc0,0xa2, 0x91,0xf0,0xd0,0x6c,0xa0,0x0d,0x2f,0xb0,
 	0xe9,0x4c,0x63,0x10,0x0a,0x00,0x72,0x14, 0x12,0xe3,0xff,0xc0,0x35,0xd0,0xbe,0x2f };
 
+void TraceChar(int c)
+{
+	if (isprint(c))
+	{
+		TRACE("%c", c);
+	}
+	else if (c == '\n')
+	{
+		TRACE("<LF>\n");
+	}
+	else if (c == '\r')
+	{
+		TRACE("<CR>");
+	}
+	else
+	{
+		TRACE("[%02x]", c);
+	}
+}
 
+/*********************************************/
+/* Serial communications interface functions */
+/*********************************************/
+/* Receive a buffer[] of serial data bytes. */
+int recv_buf_start(unsigned char* buf, int size, int count, unsigned char* pat)
+{
+	int len = 0;
+	int delay = 250;
+
+	TRACE("recv_buf_start(@%08x, %d, %d, [", buf, size, count);
+	for (int i = 0; i < count; i++)
+	{
+		TRACE("%02x ", pat[i]);
+	}
+	TRACE("]){\n");
+	while (len < count)
+	{
+		if (com->RxCount() > 0)
+		{
+			int c;
+			c = com->RxGetch();
+			TraceChar(c);
+			buf[len] = c;
+			int ch = pat[len];
+			len++;
+			if (c != ch)
+				len = 0;
+			delay = 10;
+		}
+		else
+		{
+			if (--delay >= 0)
+			{
+				com->Sleep(1);
+			}
+			else
+			{
+				printf("rx: Timeout!");
+				return ERR_NMP_TIMEOUT;
+			}
+		}
+	}
+	TRACE("} len=%d\n", len);
+	return len;
+}
+
+#if 1
 int recv_buf(unsigned char *buf, int size, int count, int ch)
 {
-	int i = 0;
+	int len = 0;
 	int delay = 50;
+
+	int m = count;
+	int i = 0;
 	bool done = false;
 	TRACE("recv_buf(@%08x, %d, %d, %d){", buf, size, count, ch);
-	while (!done && count > 0)
+	while (len < count)
+	{
+		if (com->RxCount() > 0)
+		{
+			int c;
+			c = com->RxGetch();
+			TraceChar(c);
+			buf[len] = c;
+			len++;
+			if (ch != -1 && c == ch)
+			{
+				break;
+			}
+			delay = 5;
+		}
+		else
+		{
+			if (--delay >= 0)
+			{
+				com->Sleep(1);
+			}
+			else
+			{
+				if (ch == -1)
+				{
+					break;
+				}
+				printf("rx: Timeout!");
+				return ERR_NMP_TIMEOUT;
+			}
+		}
+	}
+	TRACE("} len=%d\n", len);
+	return len;
+}
+#else
+
+int recv_buf(unsigned char* buf, int size, int count, int ch)
+{
+	int len = 0;
+	int delay = 50;
+
+	int m = count;
+	int i = 0;
+	bool done = false;
+	TRACE("recv_buf(@%08x, %d, %d, %d){", buf, size, count, ch);
+	while (!done && m > 0)
 	{
 		int n = com->RxCount();
 		if (n > 0)
 		{
-			for (int i=0; i < n && !done && count > 0; i++, count--)
+			for (int i = 0; i < n && !done && m > 0; i++, m--)
 			{
 				int c;
 				c = com->RxGetch();
@@ -2586,13 +2701,10 @@ int recv_buf(unsigned char *buf, int size, int count, int ch)
 					done = true;
 					break;
 				}
-				if (isprint(c))
-					TRACE("%c", c);
-				else
-					TRACE("[%02x]", c);
+				TraceChar(c);
 				*buf++ = c;
 			}
-			if (!done && count > 0)
+			if (!done && m > 0)
 			{
 				delay = 5;
 				com->Sleep(1);
@@ -2603,15 +2715,18 @@ int recv_buf(unsigned char *buf, int size, int count, int ch)
 			com->Sleep(1);
 			if (--delay <= 0)
 			{
-				printf("\n");
+				//printf("\n");
 				done = true;
 			}
 		}
 	}
-	TRACE("} return count=%x\n", count);
-	return count;
+	len = count - m;
+	//TRACE("} len=%d\n", len);
+	return len;
 }
+#endif
 
+/* Send a buffer[] of data bytes over serial. */
 void send_buf(unsigned char *buf, int n)
 {
 	//MEM_Trace(buf, n, 0L);
@@ -2626,14 +2741,53 @@ void send_buf(unsigned char *buf, int n)
 	com->Sleep(1);
 }
 
+/* Send a pre-formatted HCI command buffer[] of data bytes over serial. */
+int send_hci_cmd(unsigned char *buf, int size, unsigned char* cmd, int txlen, int rxlen)
+{
+	TRACE("tx hci cmd:\n");
+	memcpy(buf, cmd, txlen);
+	MEM_Trace(cmd, txlen, 0L);
+	send_buf(buf, txlen);
+	int n = recv_buf(buf, sizeof(buf), rxlen, -1);
+	TRACE("rx hci resp:");
+	if (n == 0)
+	{
+		printf("HCI Timeout!\n");
+	}
+	else
+	{
+		TRACE(" n=%d\n", n);
+		MEM_Trace(buf, n, 0L);
+		TMR_Delay(1);
+	}
+	return n;
+}
+
+/*********************************************/
+/* NLIP serial type definitions.             */
+/*********************************************/
+
 /* NLIP packets sent over serial are fragmented into frames of 127 bytes or
  * fewer. This 127-byte maximum applies to the entire frame, including header,
  * CRC, and terminating newline.
  */
 #define MGMT_NLIP_MAX_FRAME     127
 
+typedef struct nlip_hdr
+{
+	uint8_t type[2];
+} nlip_hdr_t;
 
- // Mcu Manager operation codes
+typedef struct nlip_pkt_t
+{
+	nlip_hdr hdr;
+	unsigned char data[0];
+} nlip_pkt_t;
+
+/*********************************************/
+/* NMP type definitions.                     */
+/*********************************************/
+// Mcu Manager operation codes
 typedef enum
 {
 	OP_READ = 0,
@@ -2728,10 +2882,10 @@ typedef struct nmp_pkt
 
 #define swapbytes(n)	((n&0xFF)<<8)+(n>>8)
 
-long total_len = 0;
-unsigned char seq = 0x01;
+long total_len = 0;				// total length of image file
+unsigned char seq = 0x01;		// next nmp sequence number to send
 
-CBOR cbor(16);
+CBOR cbor(16);					// CBOR token parsing storage array
 
 void TraceNmpHdr(nmp_hdr_t* hdr)
 {
@@ -2739,6 +2893,7 @@ void TraceNmpHdr(nmp_hdr_t* hdr)
 	TRACE(" Op:%d Flags:%d Len:%d Group:%d Seq:%d Id:%d\n",
 		hdr->Op, hdr->Flags, swapbytes(hdr->Len), swapbytes(hdr->Group), hdr->Seq, hdr->Id);
 }
+
 
 int recv_nmp_rsp(unsigned char *dec, int size, uint8_t Op, uint16_t Group, uint8_t Id)
 {
@@ -2748,29 +2903,33 @@ int recv_nmp_rsp(unsigned char *dec, int size, uint8_t Op, uint16_t Group, uint8
 	}
 
 	unsigned char enc[256];
-	int len;
-	// Receive the type of the NLIP packet (ie. the first 2 bytes):
-	if (recv_buf(enc, sizeof(enc), 2, -1) != 0)
+	unsigned char pat[2] = { 0x06, 0x09 };
+
+	// Find the start of the NLIP packet:
+	int len = recv_buf_start(enc, sizeof(enc), sizeof(pat), pat);
+	if (len < 0)
 	{
-		printf("rx: Timeout!");
-		return ERR_NMP_TIMEOUT;
+		return len;
 	}
-	TRACE("rx: %02x %02x\n", enc[0], enc[1]);
+
 	// Receive body of the NLIP packet (ie. ascii text that is terminated with a <LF>):
-	int k = recv_buf(enc, sizeof(enc), sizeof(enc) - 1, '\r');
-	len = (sizeof(enc) - 1) - k;
-	enc[len] = '\0';	// remove anything after the trailing <LF>
-	TRACE("rx: '%s'\n", enc);
+	len = recv_buf(enc, sizeof(enc), sizeof(enc)-1, '\r');
+	if (len < 1)
+	{
+		return -1;
+	}
+	enc[len-1] = '\0';	// remove anything after the trailing <LF>
+	TRACE("rx: '%s'\n", &enc[0]);
 	int m;
-	//m = base64_decode_len((char *)enc);
-	m = base64_decode((char *)enc, dec);
+	//m = base64_decode_len((char*)enc);
+	m = base64_decode((char*)enc, dec);
 	if (m <= 0)
 	{
 		printf("rx: Decode failure!\n");
 		return ERR_NMP_DECODE;
 	}
 	// NMP header (8-bytes):
-	k = swapbytes(*(uint16_t*)&dec[0]);
+	int k = swapbytes(*(uint16_t*)&dec[0]);
 	MEM_Trace(&dec[2], k, 0L);
 	TRACE("nmp len=%04x ", k);
 	struct nmp_pkt* pkt = (struct nmp_pkt*)&dec[2];
@@ -2806,17 +2965,6 @@ void InitNmpHdr(nmp_hdr_t* hdr, uint8_t Op, uint8_t Flags, uint16_t Len, uint16_
 	hdr->Seq = Seq;
 	hdr->Id = Id;
 }
-
-typedef struct nlip_hdr
-{
-	uint8_t type[2];
-} nlip_hdr_t;
-
-typedef struct nlip_pkt_t
-{
-	nlip_hdr hdr;
-	unsigned char data[0];
-} nlip_pkt_t;
 
 unsigned char* load_file(char* filename, long* size)
 {
@@ -2870,7 +3018,7 @@ unsigned char* load_file(char* filename, long* size)
 	return data;
 }
 
-// Receive nmp packets from a file and recreate the image file.
+// Simulated receiving of the saved data stream that was uploaded previously.
 /*
 	offset 0:    0x06 0x09
 	== = Begin base64 encoding == =
@@ -2889,7 +3037,7 @@ unsigned char* load_file(char* filename, long* size)
 	== = End base64 encoding == =
 	offset ? : 0x0a (newline)
 */
-int nmp_download(char *fndata)
+int download(char *fndata)
 {
 	unsigned char dec[520];
 	long count = 0;		// NMP packet counter
@@ -2897,7 +3045,7 @@ int nmp_download(char *fndata)
 	unsigned int len = 0;
 	char fnimage[80];
 
-	TRACE("nmp_download(%s)\n", fndata);
+	TRACE("download(%s)\n", fndata);
 	strcpy(fnimage, fndata);
 	char *p = strchr(fnimage, '.');
 	if (p)
@@ -3097,27 +3245,6 @@ int send_nmp_req(unsigned char *buf, int size, uint8_t Op, uint16_t Group, uint8
 	return j;
 }
 
-int send_hci_cmd(unsigned char *buf, int size, unsigned char* cmd, int txlen, int rxlen)
-{
-	TRACE("tx hci cmd:\n");
-	memcpy(buf, cmd, txlen);
-	MEM_Trace(cmd, txlen, 0L);
-	send_buf(buf, txlen);
-	int n = rxlen - recv_buf(buf, sizeof(buf), rxlen, -1);
-	TRACE("rx hci resp:");
-	if (n == 0)
-	{
-		printf("HCI Timeout!\n");
-	}
-	else
-	{
-		TRACE(" n=%d\n", n);
-		MEM_Trace(buf, n, 0L);
-		TMR_Delay(1);
-	}
-	return n;
-}
-
 // Transmit a nmp imagelist request
 static int send_imagelist(unsigned char *buf, int size)
 {
@@ -3125,14 +3252,15 @@ static int send_imagelist(unsigned char *buf, int size)
 	cbor.Init(&buf[2 + sizeof(nmp_hdr_t)], sizeof(buf) - 2 - sizeof(nmp_hdr_t));
 	cbor.def_map(0);
 	send_nmp_req(buf, sizeof(buf), OP_READ, GROUP_IMAGE, IMAGE_ID_STATE, &cbor);
-	if (recv_nmp_rsp(buf, sizeof(buf), OP_READ_RSP, GROUP_IMAGE, IMAGE_ID_STATE) != 0)
+	int rc = recv_nmp_rsp(buf, sizeof(buf), OP_READ_RSP, GROUP_IMAGE, IMAGE_ID_STATE);
+	if (rc < 0)
 	{
-		return -1;
+		return rc;
 	}
 	return 0;
 }
 
-int nmp_imagelist(void)
+int imagelist(void)
 {
 	unsigned char buf[256];
 
@@ -3168,30 +3296,53 @@ static int send_reset(unsigned char *buf, int size)
 	send_nmp_req(buf, size, OP_WRITE, GROUP_DEFAULT, DEFAULT_ID_RESET, &cbor);
 
 	// Receive the response buf[].
-	if (recv_nmp_rsp(buf, size, OP_WRITE_RSP, GROUP_DEFAULT, DEFAULT_ID_RESET) != 0)
+	int rc = recv_nmp_rsp(buf, size, OP_WRITE_RSP, GROUP_DEFAULT, DEFAULT_ID_RESET);
+	if (rc < 0)
 	{
-		return -1;
+		return rc;
 	}
 	return 0;
 }
 
-int nmp_reset(void)
+int reset(void)
 {
 	unsigned char buf[256];
+	int n;
 
 	printf("Reset:\n");
 	if (send_reset(buf, sizeof(buf)) != 0)
 	{
 		return -1;
 	}
+	char pat1[] = { "Boot detect" };
+	n = recv_buf_start(buf, sizeof(buf), sizeof(pat1) - 1, (unsigned char*)pat1);
+	if (n < 0)
+	{
+		printf("<nil>\n");
+		return n;
+	}
+	else
+	{
+		buf[n] = '\0';
+		printf("%s\n", (char*)buf);
+	}
 
 	// Wait >5 seconds after a software reset for the Bootloader to startup.
 	TMR_Delay(55);
 
 	// Check if the Bootloader signon has been received.
-	int n = sizeof(buf) - recv_buf(buf, sizeof(buf), sizeof(buf), -1);
-	buf[n] = '\0';
-	printf("%s\n", (char*)buf);
+	char pat2[] = { "Boot valid" };
+	n = recv_buf_start(buf, sizeof(buf), sizeof(pat2)-1, (unsigned char *)pat2);
+	if (n < 0)
+	{
+		printf("<nil>\n");
+		return n;
+	}
+	else
+	{
+		buf[n] = '\0';
+		printf("%s\n", (char*)buf);
+	}
 	return 0;
 }
 
@@ -3219,9 +3370,10 @@ static int send_upload(unsigned char *buf, int size, unsigned int offset, int nb
 	send_nmp_req(buf, size, OP_WRITE, GROUP_IMAGE, IMAGE_ID_UPLOAD, &cbor);
 
 	// Receive the response buf[].
-	if (recv_nmp_rsp(buf, sizeof(buf), OP_WRITE_RSP, GROUP_IMAGE, IMAGE_ID_UPLOAD) != 0)
+	int rc = recv_nmp_rsp(buf, sizeof(buf), OP_WRITE_RSP, GROUP_IMAGE, IMAGE_ID_UPLOAD);
+	if (rc < 0)
 	{
-		return -1;
+		return rc;
 	}
 	return 0;
 }
@@ -3281,7 +3433,7 @@ int send_upload_next(unsigned int offset, int *size, unsigned char *data)
 	return 0;
 }
 
-int nmp_upload(char *fnimage)
+int upload(char *fnimage)
 {
 	/* Dumb resource intensive way is to read the whole file into a large data buffer! */
 	unsigned char* data = load_file(fnimage, &total_len);
@@ -3546,7 +3698,7 @@ int main(int argc, char* argv[])
 					printf("nmgr>\n");
 				}
 			}
-			rc = nmp_imagelist();
+			rc = imagelist();
 			if (rc < 0)
 			{
 				COM_Term();
@@ -3569,13 +3721,13 @@ int main(int argc, char* argv[])
 
 			if (ifile)
 			{
-				rc = nmp_upload(ifile);
+				rc = upload(ifile);
 				if (rc < 0)
 				{
 					COM_Term();
 					goto err;
 				}
-				rc = nmp_imagelist();
+				rc = imagelist();
 				if (rc < 0)
 				{
 					COM_Term();
@@ -3584,7 +3736,7 @@ int main(int argc, char* argv[])
 			}
 			if (rflag)
 			{
-				rc = nmp_reset();
+				rc = reset();
 				if (rc < 0)
 				{
 					COM_Term();
@@ -3596,7 +3748,7 @@ int main(int argc, char* argv[])
 	}
 	if (tflag && oflag)
 	{
-		rc = nmp_download(ofile);
+		rc = download(ofile);
 		if (rc < 0)
 		{
 			goto err;
