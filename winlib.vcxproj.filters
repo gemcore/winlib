@@ -188,6 +188,11 @@
     </ClInclude>
     <ClInclude Include="src\base64.h">
       <Filter>Source Files</Filter>
+    <ClInclude Include="src\base64\base64.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\cbor\cbor.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -360,6 +365,13 @@
       <Filter>Source Files\third_party\dhara\ecc</Filter>
     </ClCompile>
     <ClCompile Include="src\base64.c">
+    <ClCompile Include="src\base64\base64.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cbor\cbor.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\crc.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

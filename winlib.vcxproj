@@ -23,32 +23,32 @@
     <ProjectGuid>{5732082D-D1E5-4769-9458-FAC51E0ED00A}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>winlib</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -146,9 +146,11 @@
   <ItemGroup>
     <ClInclude Include="src\active.h" />
     <ClInclude Include="src\ASCII.H" />
+    <ClInclude Include="src\base64\base64.h" />
     <ClInclude Include="src\BASEFILE.HPP" />
     <ClInclude Include="src\bsp.h" />
     <ClInclude Include="src\cfg.h" />
+    <ClInclude Include="src\cbor\cbor.h" />
     <ClInclude Include="src\CIRCBUF.HPP" />
     <ClInclude Include="src\cli.h" />
     <ClInclude Include="src\comport.h" />
@@ -194,14 +196,20 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\active.cpp" />
+    <ClCompile Include="src\base64\base64.c" />
     <ClCompile Include="src\BASEFILE.CPP" />
     <ClCompile Include="src\bsp.c" />
     <ClCompile Include="src\cfg.c" />
+    <ClCompile Include="src\cbor\cbor.c" />
     <ClCompile Include="src\CIRCBUF.CPP" />
     <ClCompile Include="src\cli.cpp" />
     <ClCompile Include="src\comport.cpp" />
     <ClCompile Include="src\dbg.c" />
     <ClCompile Include="src\evt.cpp" />
+    <ClCompile Include="src\crc.c" />
+    <ClCompile Include="src\dhara\error.c" />
+    <ClCompile Include="src\dhara\journal.c" />
+    <ClCompile Include="src\dhara\map.c" />
     <ClCompile Include="src\LOG.CPP" />
     <ClCompile Include="src\main_map.c" />
     <ClCompile Include="src\main_nand.c" />
