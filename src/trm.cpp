@@ -26,8 +26,8 @@
  ******************************************************************************/
 extern "C"
 {
-#include "term.h"
-#include "platform_conf.h"
+#include "third_party\term\term.h"
+#include "third_party\term\platform_conf.h"
 
 #define TRM_LINES           TERM_LINES
 #define TRM_COLS            TERM_COLS

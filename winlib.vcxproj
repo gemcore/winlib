@@ -102,7 +102,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <AdditionalIncludeDirectories>C:\Users\Alan\Documents\Visual Studio 2017\Projects\winlib\src;C:\Users\Alan\Documents\Visual Studio 2017\Projects\winlib\src\utils;C:\Users\Alan\Documents\Visual Studio 2017\Projects\winlib\src\third_party\term;C:\Users\Alan\Documents\Visual Studio 2017\Projects\winlib\src\third_party\picoC;C:\Users\Alan\Documents\Visual Studio 2017\Projects\winlib\src\third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir)src\utils;$(ProjectDir)src\third_party\term;$(ProjectDir)src\third_party\picoC;$(ProjectDir)src\third_party\lua;$(ProjectDir)src\third_party\dhara;$(ProjectDir)src\third_party\dhara\test;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -146,7 +146,6 @@
   <ItemGroup>
     <ClInclude Include="src\active.h" />
     <ClInclude Include="src\ASCII.H" />
-    <ClInclude Include="src\base64\base64.h" />
     <ClInclude Include="src\BASEFILE.HPP" />
     <ClInclude Include="src\bsp.h" />
     <ClInclude Include="src\cfg.h" />
@@ -161,11 +160,9 @@
     <ClInclude Include="src\MDM.H" />
     <ClInclude Include="src\pts.hpp" />
     <ClInclude Include="src\SCRIPT.HPP" />
-    <ClInclude Include="src\sim.h" />
     <ClInclude Include="src\SYSERR.H" />
     <ClInclude Include="src\third_party\base64\base64.h" />
     <ClInclude Include="src\third_party\dhara\bytes.h" />
-    <ClInclude Include="src\third_party\dhara\ecc\bch.h" />
     <ClInclude Include="src\third_party\dhara\ecc\crc32.h" />
     <ClInclude Include="src\third_party\dhara\ecc\gf13.h" />
     <ClInclude Include="src\third_party\dhara\ecc\hamming.h" />
@@ -173,6 +170,8 @@
     <ClInclude Include="src\third_party\dhara\journal.h" />
     <ClInclude Include="src\third_party\dhara\map.h" />
     <ClInclude Include="src\third_party\dhara\nand.h" />
+    <ClInclude Include="src\third_party\dhara\tests\sim.h" />
+    <ClInclude Include="src\third_party\dhara\tests\util.h" />
     <ClInclude Include="src\third_party\picoC\interpreter.h" />
     <ClInclude Include="src\third_party\picoC\LICENSE.h" />
     <ClInclude Include="src\third_party\picoC\picoc.h" />
@@ -185,7 +184,6 @@
     <ClInclude Include="src\Thread.h" />
     <ClInclude Include="src\TIMER.H" />
     <ClInclude Include="src\TMR.H" />
-    <ClInclude Include="src\util.h" />
     <ClInclude Include="src\Utils.hpp" />
     <ClInclude Include="src\utils\ringbuf.h" />
     <ClInclude Include="src\wassert.h" />
@@ -205,19 +203,13 @@
     <ClCompile Include="src\cli.cpp" />
     <ClCompile Include="src\comport.cpp" />
     <ClCompile Include="src\dbg.c" />
-    <ClCompile Include="src\evt.cpp" />
     <ClCompile Include="src\crc.c" />
-    <ClCompile Include="src\dhara\error.c" />
-    <ClCompile Include="src\dhara\journal.c" />
-    <ClCompile Include="src\dhara\map.c" />
+    <ClCompile Include="src\evt.cpp" />
     <ClCompile Include="src\LOG.CPP" />
     <ClCompile Include="src\main_map.c" />
-    <ClCompile Include="src\main_nand.c" />
     <ClCompile Include="src\pts.cpp" />
     <ClCompile Include="src\SCRIPT.CPP" />
-    <ClCompile Include="src\sim.c" />
     <ClCompile Include="src\ted.cpp" />
-    <ClCompile Include="src\third_party\base64\base64.c" />
     <ClCompile Include="src\third_party\dhara\ecc\bch.c" />
     <ClCompile Include="src\third_party\dhara\ecc\crc32.c" />
     <ClCompile Include="src\third_party\dhara\ecc\gf13.c" />
@@ -225,6 +217,8 @@
     <ClCompile Include="src\third_party\dhara\error.c" />
     <ClCompile Include="src\third_party\dhara\journal.c" />
     <ClCompile Include="src\third_party\dhara\map.c" />
+    <ClCompile Include="src\third_party\dhara\tests\sim.c" />
+    <ClCompile Include="src\third_party\dhara\tests\util.c" />
     <ClCompile Include="src\third_party\picoC\clibrary.c" />
     <ClCompile Include="src\third_party\picoC\cstdlib\ctype.c" />
     <ClCompile Include="src\third_party\picoC\cstdlib\errno.c" />
@@ -252,7 +246,6 @@
     <ClCompile Include="src\TIMER.CPP" />
     <ClCompile Include="src\TMR.CPP" />
     <ClCompile Include="src\trm.cpp" />
-    <ClCompile Include="src\util.c" />
     <ClCompile Include="src\Utils.cpp" />
     <ClCompile Include="src\utils\ringbuf.c" />
     <ClCompile Include="src\Win32Exception.cpp" />

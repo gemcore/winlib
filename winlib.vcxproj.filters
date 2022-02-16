@@ -1,384 +1,119 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Source Files">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
-    <Filter Include="Header Files">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
-    </Filter>
-    <Filter Include="Resource Files">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
-    </Filter>
-    <Filter Include="Source Files\tests">
-      <UniqueIdentifier>{9e42d048-3fd8-4e7b-9e7a-c639634d8cb4}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\third_party">
-      <UniqueIdentifier>{4da439a5-3440-4ace-9777-3bef3acf1ad9}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\third_party\picoC">
-      <UniqueIdentifier>{d9ebcf3f-3738-4df6-8432-39201dc2c917}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\third_party\picoC\platform">
-      <UniqueIdentifier>{36e31fdf-046d-4f70-ad3b-911e734cd47b}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\third_party\picoC\cstdlib">
-      <UniqueIdentifier>{1db909c3-5bf4-4cda-8435-ff6bd529e68f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\third_party\term">
-      <UniqueIdentifier>{b8ab706b-5d4d-44c0-9ed4-301b085a9fe8}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\third_party\dhara">
-      <UniqueIdentifier>{4f9dd7c5-9e48-46ac-afb7-c108e0df646d}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\utils">
-      <UniqueIdentifier>{10b01596-68c1-441d-b73e-8bd75d58b8ea}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\third_party\dhara\ecc">
-      <UniqueIdentifier>{26e8e18c-6f18-4dae-94a1-9a8be6a7a3d8}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\third_party\dhara\tests">
-      <UniqueIdentifier>{136b15bb-2567-47e9-b805-3bd79d629773}</UniqueIdentifier>
-    </Filter>
+    <ClCompile Include="src\active.cpp" />
+    <ClCompile Include="src\base64\base64.c" />
+    <ClCompile Include="src\BASEFILE.CPP" />
+    <ClCompile Include="src\cfg.c" />
+    <ClCompile Include="src\cbor\cbor.c" />
+    <ClCompile Include="src\CIRCBUF.CPP" />
+    <ClCompile Include="src\comport.cpp" />
+    <ClCompile Include="src\dbg.c" />
+    <ClCompile Include="src\crc.c" />
+    <ClCompile Include="src\LOG.CPP" />
+    <ClCompile Include="src\pts.cpp" />
+    <ClCompile Include="src\SCRIPT.CPP" />
+    <ClCompile Include="src\third_party\dhara\ecc\bch.c" />
+    <ClCompile Include="src\third_party\dhara\ecc\crc32.c" />
+    <ClCompile Include="src\third_party\dhara\ecc\gf13.c" />
+    <ClCompile Include="src\third_party\dhara\ecc\hamming.c" />
+    <ClCompile Include="src\third_party\dhara\journal.c" />
+    <ClCompile Include="src\third_party\dhara\map.c" />
+    <ClCompile Include="src\third_party\picoC\clibrary.c" />
+    <ClCompile Include="src\third_party\picoC\cstdlib\ctype.c" />
+    <ClCompile Include="src\third_party\picoC\cstdlib\math.c" />
+    <ClCompile Include="src\third_party\picoC\cstdlib\stdbool.c" />
+    <ClCompile Include="src\third_party\picoC\cstdlib\stdio.c" />
+    <ClCompile Include="src\third_party\picoC\cstdlib\stdlib.c" />
+    <ClCompile Include="src\third_party\picoC\cstdlib\string.c" />
+    <ClCompile Include="src\third_party\picoC\cstdlib\time.c" />
+    <ClCompile Include="src\third_party\picoC\debug.c" />
+    <ClCompile Include="src\third_party\picoC\expression.c" />
+    <ClCompile Include="src\third_party\picoC\heap.c" />
+    <ClCompile Include="src\third_party\picoC\include.c" />
+    <ClCompile Include="src\third_party\picoC\lex.c" />
+    <ClCompile Include="src\third_party\picoC\parse.c" />
+    <ClCompile Include="src\third_party\picoC\picoc.c" />
+    <ClCompile Include="src\third_party\picoC\platform.c" />
+    <ClCompile Include="src\third_party\picoC\platform\platform_tm4c129x.c" />
+    <ClCompile Include="src\third_party\picoC\table.c" />
+    <ClCompile Include="src\third_party\picoC\type.c" />
+    <ClCompile Include="src\third_party\picoC\variable.c" />
+    <ClCompile Include="src\TIMER.CPP" />
+    <ClCompile Include="src\TMR.CPP" />
+    <ClCompile Include="src\Utils.cpp" />
+    <ClCompile Include="src\utils\ringbuf.c" />
+    <ClCompile Include="src\Win32Exception.cpp" />
+    <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="winlib.cpp" />
+    <ClCompile Include="src\third_party\term\term.c" />
+    <ClCompile Include="src\bsp.c" />
+    <ClCompile Include="src\evt.cpp" />
+    <ClCompile Include="src\third_party\term\linenoise.cpp" />
+    <ClCompile Include="src\cli.cpp" />
+    <ClCompile Include="src\third_party\term\history.cpp" />
+    <ClCompile Include="src\trm.cpp" />
+    <ClCompile Include="src\third_party\dhara\error.c" />
+    <ClCompile Include="src\third_party\dhara\tests\util.c" />
+    <ClCompile Include="src\third_party\dhara\tests\sim.c" />
+    <ClCompile Include="src\third_party\picoC\cstdlib\errno.c" />
+    <ClCompile Include="src\main_map.c" />
+    <ClCompile Include="src\ted.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <Text Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="stdafx.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="targetver.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\active.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\ASCII.H">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\BASEFILE.HPP">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\CIRCBUF.HPP">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\comport.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\GENERIC.HPP">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\SCRIPT.HPP">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\SYSERR.H">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Thread.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TIMER.H">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Utils.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\wassert.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Win32Exception.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\winex.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TMR.H">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\LOG.H">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\sim.h">
-      <Filter>Source Files\tests</Filter>
-    </ClInclude>
-    <ClInclude Include="src\util.h">
-      <Filter>Source Files\tests</Filter>
-    </ClInclude>
-    <ClInclude Include="src\MDM.H">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\bsp.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\cfg.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\cli.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\dbg.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\evt.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\pts.hpp">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\third_party\dhara\bytes.h">
-      <Filter>Source Files\third_party\dhara</Filter>
-    </ClInclude>
-    <ClInclude Include="src\third_party\dhara\error.h">
-      <Filter>Source Files\third_party\dhara</Filter>
-    </ClInclude>
-    <ClInclude Include="src\third_party\dhara\journal.h">
-      <Filter>Source Files\third_party\dhara</Filter>
-    </ClInclude>
-    <ClInclude Include="src\third_party\dhara\map.h">
-      <Filter>Source Files\third_party\dhara</Filter>
-    </ClInclude>
-    <ClInclude Include="src\third_party\dhara\nand.h">
-      <Filter>Source Files\third_party\dhara</Filter>
-    </ClInclude>
-    <ClInclude Include="src\third_party\term\history.h">
-      <Filter>Source Files\third_party\term</Filter>
-    </ClInclude>
-    <ClInclude Include="src\third_party\term\linenoise.h">
-      <Filter>Source Files\third_party\term</Filter>
-    </ClInclude>
-    <ClInclude Include="src\third_party\term\platform_conf.h">
-      <Filter>Source Files\third_party\term</Filter>
-    </ClInclude>
-    <ClInclude Include="src\third_party\term\term.h">
-      <Filter>Source Files\third_party\term</Filter>
-    </ClInclude>
-    <ClInclude Include="src\third_party\term\type.h">
-      <Filter>Source Files\third_party\term</Filter>
-    </ClInclude>
-    <ClInclude Include="src\third_party\picoC\interpreter.h">
-      <Filter>Source Files\third_party\picoC</Filter>
-    </ClInclude>
-    <ClInclude Include="src\third_party\picoC\LICENSE.h">
-      <Filter>Source Files\third_party\picoC</Filter>
-    </ClInclude>
-    <ClInclude Include="src\third_party\picoC\picoc.h">
-      <Filter>Source Files\third_party\picoC</Filter>
-    </ClInclude>
-    <ClInclude Include="src\third_party\picoC\platform.h">
-      <Filter>Source Files\third_party\picoC</Filter>
-    </ClInclude>
-    <ClInclude Include="src\utils\ringbuf.h">
-      <Filter>Source Files\utils</Filter>
-    </ClInclude>
-    <ClInclude Include="src\third_party\dhara\ecc\bch.h">
-      <Filter>Source Files\third_party\dhara\ecc</Filter>
-    </ClInclude>
-    <ClInclude Include="src\third_party\dhara\ecc\crc32.h">
-      <Filter>Source Files\third_party\dhara\ecc</Filter>
-    </ClInclude>
-    <ClInclude Include="src\third_party\dhara\ecc\gf13.h">
-      <Filter>Source Files\third_party\dhara\ecc</Filter>
-    </ClInclude>
-    <ClInclude Include="src\third_party\dhara\ecc\hamming.h">
-      <Filter>Source Files\third_party\dhara\ecc</Filter>
-    </ClInclude>
-    <ClInclude Include="src\base64.h">
-      <Filter>Source Files</Filter>
-    <ClInclude Include="src\base64\base64.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\cbor\cbor.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="stdafx.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="winlib.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\active.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\BASEFILE.CPP">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\CIRCBUF.CPP">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\comport.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\SCRIPT.CPP">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\TIMER.CPP">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Utils.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Win32Exception.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\TMR.CPP">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\LOG.CPP">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\sim.c">
-      <Filter>Source Files\tests</Filter>
-    </ClCompile>
-    <ClCompile Include="src\util.c">
-      <Filter>Source Files\tests</Filter>
-    </ClCompile>
-    <ClCompile Include="src\main_map.c">
-      <Filter>Source Files\tests</Filter>
-    </ClCompile>
-    <ClCompile Include="src\main_nand.c">
-      <Filter>Source Files\tests</Filter>
-    </ClCompile>
-    <ClCompile Include="src\bsp.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\cfg.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\cli.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\dbg.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\evt.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\pts.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\ted.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\trm.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\dhara\error.c">
-      <Filter>Source Files\third_party\dhara</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\dhara\journal.c">
-      <Filter>Source Files\third_party\dhara</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\dhara\map.c">
-      <Filter>Source Files\third_party\dhara</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\term\history.cpp">
-      <Filter>Source Files\third_party\term</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\term\linenoise.cpp">
-      <Filter>Source Files\third_party\term</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\term\term.c">
-      <Filter>Source Files\third_party\term</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\picoC\clibrary.c">
-      <Filter>Source Files\third_party\picoC</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\picoC\debug.c">
-      <Filter>Source Files\third_party\picoC</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\picoC\expression.c">
-      <Filter>Source Files\third_party\picoC</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\picoC\heap.c">
-      <Filter>Source Files\third_party\picoC</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\picoC\include.c">
-      <Filter>Source Files\third_party\picoC</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\picoC\lex.c">
-      <Filter>Source Files\third_party\picoC</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\picoC\parse.c">
-      <Filter>Source Files\third_party\picoC</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\picoC\picoc.c">
-      <Filter>Source Files\third_party\picoC</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\picoC\platform.c">
-      <Filter>Source Files\third_party\picoC</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\picoC\table.c">
-      <Filter>Source Files\third_party\picoC</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\picoC\type.c">
-      <Filter>Source Files\third_party\picoC</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\picoC\variable.c">
-      <Filter>Source Files\third_party\picoC</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\picoC\platform\platform_tm4c129x.c">
-      <Filter>Source Files\third_party\picoC\platform</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\picoC\cstdlib\ctype.c">
-      <Filter>Source Files\third_party\picoC\cstdlib</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\picoC\cstdlib\errno.c">
-      <Filter>Source Files\third_party\picoC\cstdlib</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\picoC\cstdlib\math.c">
-      <Filter>Source Files\third_party\picoC\cstdlib</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\picoC\cstdlib\stdbool.c">
-      <Filter>Source Files\third_party\picoC\cstdlib</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\picoC\cstdlib\stdio.c">
-      <Filter>Source Files\third_party\picoC\cstdlib</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\picoC\cstdlib\stdlib.c">
-      <Filter>Source Files\third_party\picoC\cstdlib</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\picoC\cstdlib\string.c">
-      <Filter>Source Files\third_party\picoC\cstdlib</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\picoC\cstdlib\time.c">
-      <Filter>Source Files\third_party\picoC\cstdlib</Filter>
-    </ClCompile>
-    <ClCompile Include="src\utils\ringbuf.c">
-      <Filter>Source Files\utils</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\dhara\ecc\bch.c">
-      <Filter>Source Files\third_party\dhara\ecc</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\dhara\ecc\crc32.c">
-      <Filter>Source Files\third_party\dhara\ecc</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\dhara\ecc\gf13.c">
-      <Filter>Source Files\third_party\dhara\ecc</Filter>
-    </ClCompile>
-    <ClCompile Include="src\third_party\dhara\ecc\hamming.c">
-      <Filter>Source Files\third_party\dhara\ecc</Filter>
-    </ClCompile>
-    <ClCompile Include="src\base64.c">
-    <ClCompile Include="src\base64\base64.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\cbor\cbor.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\crc.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
+    <ClInclude Include="src\active.h" />
+    <ClInclude Include="src\ASCII.H" />
+    <ClInclude Include="src\BASEFILE.HPP" />
+    <ClInclude Include="src\bsp.h" />
+    <ClInclude Include="src\cfg.h" />
+    <ClInclude Include="src\cbor\cbor.h" />
+    <ClInclude Include="src\CIRCBUF.HPP" />
+    <ClInclude Include="src\comport.h" />
+    <ClInclude Include="src\dbg.h" />
+    <ClInclude Include="src\GENERIC.HPP" />
+    <ClInclude Include="src\LOG.H" />
+    <ClInclude Include="src\MDM.H" />
+    <ClInclude Include="src\pts.hpp" />
+    <ClInclude Include="src\SCRIPT.HPP" />
+    <ClInclude Include="src\SYSERR.H" />
+    <ClInclude Include="src\third_party\base64\base64.h" />
+    <ClInclude Include="src\third_party\dhara\bytes.h" />
+    <ClInclude Include="src\third_party\dhara\ecc\crc32.h" />
+    <ClInclude Include="src\third_party\dhara\ecc\gf13.h" />
+    <ClInclude Include="src\third_party\dhara\ecc\hamming.h" />
+    <ClInclude Include="src\third_party\dhara\journal.h" />
+    <ClInclude Include="src\third_party\picoC\interpreter.h" />
+    <ClInclude Include="src\third_party\picoC\LICENSE.h" />
+    <ClInclude Include="src\third_party\picoC\picoc.h" />
+    <ClInclude Include="src\third_party\picoC\platform.h" />
+    <ClInclude Include="src\Thread.h" />
+    <ClInclude Include="src\TIMER.H" />
+    <ClInclude Include="src\TMR.H" />
+    <ClInclude Include="src\Utils.hpp" />
+    <ClInclude Include="src\utils\ringbuf.h" />
+    <ClInclude Include="src\wassert.h" />
+    <ClInclude Include="src\Win32Exception.hpp" />
+    <ClInclude Include="src\winex.h" />
+    <ClInclude Include="stdafx.h" />
+    <ClInclude Include="targetver.h" />
+    <ClInclude Include="src\third_party\term\platform_conf.h" />
+    <ClInclude Include="src\third_party\term\type.h" />
+    <ClInclude Include="src\evt.h" />
+    <ClInclude Include="src\third_party\term\linenoise.h" />
+    <ClInclude Include="src\cli.h" />
+    <ClInclude Include="src\third_party\term\history.h" />
+    <ClInclude Include="src\third_party\term\term.h" />
+    <ClInclude Include="src\third_party\dhara\error.h" />
+    <ClInclude Include="src\third_party\dhara\map.h" />
+    <ClInclude Include="src\third_party\dhara\tests\util.h" />
+    <ClInclude Include="src\third_party\dhara\nand.h" />
+    <ClInclude Include="src\third_party\dhara\tests\sim.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" />
-    <None Include="src\third_party\picoC\LICENSE">
-      <Filter>Source Files\third_party\picoC</Filter>
-    </None>
+    <None Include="src\third_party\picoC\LICENSE" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="ReadMe.txt" />
   </ItemGroup>
 </Project>

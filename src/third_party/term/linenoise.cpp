@@ -83,7 +83,7 @@
 #include <errno.h>
 #include <string.h>
 #include <ctype.h>
-#include "bsp.h"
+#include "..\..\bsp.h"
 #ifndef WIN32
 #include "fio.h"
 #include "ustdlib.h"

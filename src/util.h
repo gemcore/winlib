@@ -19,7 +19,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include "dhara/error.h"
+#include "error.h"
 
 /* Abort, displaying an error */
 void dabort(const char *message, dhara_error_t err);

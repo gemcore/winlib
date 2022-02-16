@@ -47,9 +47,9 @@
 #endif
 #endif
 #include "cfg.h"
-#include "term.h"
-#include "linenoise.h"
-#include "platform_conf.h"
+#include "third_party\term\term.h"
+#include "third_party\term\linenoise.h"
+#include "third_party\term\platform_conf.h"
 
 extern "C" void TRM_Init();
 extern "C" void TRM_Term();

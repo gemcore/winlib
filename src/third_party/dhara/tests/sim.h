@@ -17,7 +17,7 @@
 #ifndef TESTS_SIM_H_
 #define TESTS_SIM_H_
 
-#include "dhara/nand.h"
+#include "nand.h"
 
 #if 0
 #define LOG2_PAGE_SIZE		9

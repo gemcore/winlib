@@ -17,8 +17,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
-#include "dhara/map.h"
-#include "dhara/bytes.h"
+#include "map.h"
+#include "bytes.h"
 #include "util.h"
 #include "sim.h"
 
