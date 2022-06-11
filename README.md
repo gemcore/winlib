@@ -36,6 +36,8 @@ The following functionality is supported:
 * File I/O (Basic)
 * Circular buffer
 * Console printf 
+* Console input/output
+* Proto Threads for non-OS use
 * Simple SCRIPT language parser/compiler
 
 # Testing
@@ -49,8 +51,6 @@ winlib is being actively developed and used on projects. Some of the features be
 for the future are as follows:
 
 * Simple SCRIPT interpreter
-* Console input/output
-* Proto Threads for non-OS use
 * Database
 
 # Suggestions
