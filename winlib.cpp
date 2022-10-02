@@ -5,9 +5,9 @@
 #include "stdint.h"
 #include "stdafx.h"
 #include "windows.h"
-#include "src\LOG.H"		// Capture putchar & printf output to a log file
-#include "src\TMR.H"
-#include "src\comport.h"
+#include "LOG.H"		// Capture putchar & printf output to a log file
+#include "TMR.H"
+#include "comport.h"
 //#include <iostream>     /* C++ stream input/output class */
 //using namespace std;
 
@@ -35,7 +35,7 @@ int dflag = false;
 
 //#define RUN_TESTING
 //#define CBOR_TESTING
-#define COM_TESTING
+//#define COM_TESTING
 //#define TMR_TESTING
 //#define MDM_TESTING
 //#define ZAR_TESTING	// not working
@@ -44,6 +44,7 @@ int dflag = false;
 //#define TED_TESTING
 //#define B64_TESTING	// not working
 
+#if 1
 /* xScript Rx initial timeout maximum value. */
 #define TMR_TIMEOUT_MAX	32000
 
@@ -71,29 +72,6 @@ void ComPort::Process(void)
 
 extern "C"
 {
-#ifndef TED_TESTING	//#if HAS_CLI == 0
-	#include "cli.h"
-
-	//*****************************************************************************
-	// This is the table that holds the command names, implementing functions, and
-	// brief description.
-	//*****************************************************************************
-	SHELL_COMMAND g_psShellCmds[] =
-	{
-	{ 0, 0, 0 }
-	};
-
-	int CON_kbhit()
-	{
-		return 0;
-	}
-
-	int CON_getc()
-	{
-		return -1;
-	}
-#endif
-
 	void MEM_Dump(uint8_t *data, uint16_t len, uint32_t base)
 	{
 		uint16_t i, j;
@@ -192,7 +170,33 @@ extern "C"
 		com->Sleep(ticks);
 	}
 }
+#endif 
 
+#ifndef TED_TESTING	//#if HAS_CLI == 0
+extern "C"
+{
+#include "cli.h"
+
+	//*****************************************************************************
+	// This is the table that holds the command names, implementing functions, and
+	// brief description.
+	//*****************************************************************************
+	SHELL_COMMAND g_psShellCmds[] =
+	{
+	{ 0, 0, 0 }
+	};
+
+	int CON_kbhit()
+	{
+		return 0;
+	}
+
+	int CON_getc()
+	{
+		return -1;
+	}
+}
+#endif
 
 #ifdef RUN_TESTING
 /*
@@ -2527,8 +2531,9 @@ int main(int argc, char* argv[])
 	return 0;
 }
 #endif
-\
-#include "src/cbor/cbor.h"
+
+#if 1
+#include "cbor/cbor.h"
 
 class CBOR
 {
@@ -3088,9 +3093,9 @@ int main(int argc, char** argv)
 #endif
 
 #ifdef COM_TESTING
-#include "src/base64/base64.h"
-#include "src/cbor/cbor.h"
-#include "src/BASEFILE.HPP"
+#include "base64/base64.h"
+#include "cbor/cbor.h"
+#include "BASEFILE.HPP"
 
 #define ERR_COM_TIMEOUT			-1
 #define ERR_HCI_TIMEOUT			-2
@@ -3983,7 +3988,7 @@ int upload(char *fnimage)
 	return 0;
 }
 
-#if 1
+#if 0
 int _main(int argc, char* argv[]);
 
 int main(int argc, char* argv[])
@@ -4284,4 +4289,6 @@ err:
 
 	return rc;
 }
+#endif
+
 #endif

@@ -45,7 +45,6 @@
     <ClCompile Include="src\utils\ringbuf.c" />
     <ClCompile Include="src\Win32Exception.cpp" />
     <ClCompile Include="stdafx.cpp" />
-    <ClCompile Include="winlib.cpp" />
     <ClCompile Include="src\third_party\term\term.c" />
     <ClCompile Include="src\bsp.c" />
     <ClCompile Include="src\evt.cpp" />
