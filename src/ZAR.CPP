@@ -208,7 +208,7 @@ int write_header(int,FIO_FILE *,char *);
 int append();
 
 /* Option flags */ 
-char lflag=1,
+static char lflag=1,
      aflag=0,
      xflag=0;
 

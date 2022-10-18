@@ -38,11 +38,10 @@ int dflag = false;
 #define COM_TESTING
 //#define TMR_TESTING
 //#define MDM_TESTING
-//#define ZAR_TESTING	// not working
+//#define ZAR_TESTING
 //#define LUA_TESTING	// not working
 //#define FTL_TESTING
 //#define TED_TESTING
-//#define B64_TESTING	// not working
 
 /* xScript Rx initial timeout maximum value. */
 #define TMR_TIMEOUT_MAX	32000
@@ -2527,7 +2526,7 @@ int main(int argc, char* argv[])
 	return 0;
 }
 #endif
-\
+
 #include "src/cbor/cbor.h"
 
 class CBOR
@@ -3983,7 +3982,7 @@ int upload(char *fnimage)
 	return 0;
 }
 
-#if 1
+#if 0
 int _main(int argc, char* argv[]);
 
 int main(int argc, char* argv[])
@@ -3991,10 +3990,10 @@ int main(int argc, char* argv[])
 	argc = 0;
 	argv[argc++] = "winlib";
 	//argv[argc++] = "-d";
-	argv[argc++] = "-p26";
-	argv[argc++] = "blehci";			// ifile
+	argv[argc++] = "-p19";
+	//argv[argc++] = "blehci";			// ifile
 	argv[argc++] = "-l";				//-"lwinlib.log";
-	argv[argc++] = "-n";
+	//argv[argc++] = "-n";
 	argv[argc++] = "-r";
 	//argv[argc++] = "-t";
 	argv[argc++] = "-ocapture";
@@ -4079,7 +4078,7 @@ int main(int argc, char* argv[])
 					break;
 
 				default:
-					fprintf(stderr, "Usage: %s [-i][file] [-o][file] [-l][file] [-c] [-e] [-d]\n", argv[0]);
+					fprintf(stderr, "Usage: %s [-i][file] [-o][file] [-l][file] [-pn] [-[t][d][n][r][q]]\n", argv[0]);
 					fprintf(stderr, "[-i][file] image upload\n");
 					fprintf(stderr, "-o[file]   capture output\n");
 					fprintf(stderr, "-l[file]   log debug output\n");

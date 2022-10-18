@@ -152,6 +152,7 @@
     <ClInclude Include="src\cbor\cbor.h" />
     <ClInclude Include="src\CIRCBUF.HPP" />
     <ClInclude Include="src\cli.h" />
+    <ClInclude Include="src\CODER.H" />
     <ClInclude Include="src\comport.h" />
     <ClInclude Include="src\dbg.h" />
     <ClInclude Include="src\evt.h" />
@@ -201,9 +202,11 @@
     <ClCompile Include="src\cbor\cbor.c" />
     <ClCompile Include="src\CIRCBUF.CPP" />
     <ClCompile Include="src\cli.cpp" />
+    <ClCompile Include="src\CODER.CPP" />
     <ClCompile Include="src\comport.cpp" />
     <ClCompile Include="src\dbg.c" />
     <ClCompile Include="src\crc.c" />
+    <ClCompile Include="src\ecc.c" />
     <ClCompile Include="src\evt.cpp" />
     <ClCompile Include="src\LOG.CPP" />
     <ClCompile Include="src\main_map.c" />
@@ -249,6 +252,7 @@
     <ClCompile Include="src\Utils.cpp" />
     <ClCompile Include="src\utils\ringbuf.c" />
     <ClCompile Include="src\Win32Exception.cpp" />
+    <ClCompile Include="src\ZAR.CPP" />
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="winlib.cpp" />
   </ItemGroup>
