@@ -58,6 +58,9 @@
     <ClCompile Include="src\third_party\picoC\cstdlib\errno.c" />
     <ClCompile Include="src\main_map.c" />
     <ClCompile Include="src\ted.cpp" />
+    <ClCompile Include="src\ZAR.CPP" />
+    <ClCompile Include="src\CODER.CPP" />
+    <ClCompile Include="src\ecc.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\active.h" />
@@ -107,6 +110,7 @@
     <ClInclude Include="src\third_party\dhara\tests\util.h" />
     <ClInclude Include="src\third_party\dhara\nand.h" />
     <ClInclude Include="src\third_party\dhara\tests\sim.h" />
+    <ClInclude Include="src\CODER.H" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" />
